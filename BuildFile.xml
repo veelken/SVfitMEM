@@ -1,0 +1,7 @@
+<use   name="root"/>
+<use   name="rootcintex"/>
+<use   name="roofit"/>
+<use   name="lhapdf"/>
+<export>
+  <lib   name="1"/>
+</export>

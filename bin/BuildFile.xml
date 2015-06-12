@@ -1,0 +1,24 @@
+<bin   file="testSVfitMEM.cc" name="testSVfitMEM">
+  <use name="FWCore/ParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
+<bin   file="testHttXsectionStableTaus.cc" name="testHttXsectionStableTaus">
+  <use name="FWCore/ParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
+<bin   file="testHttXsectionWithTauDecays.cc" name="testHttXsectionWithTauDecays">
+  <use name="FWCore/ParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
+<bin   file="testTFNormalization.cc" name="testTFNormalization">
+  <use name="FWCore/ParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
