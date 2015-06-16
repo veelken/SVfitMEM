@@ -29,6 +29,7 @@ namespace svFitMEM
     double mH_;
     double mH2_;
 
+    double sqrtS_;
     double s_;
     double invSqrtS_;
     Vector beamAxis_;

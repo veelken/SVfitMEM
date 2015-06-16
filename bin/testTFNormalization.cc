@@ -97,7 +97,7 @@ double gTF_hadTau(double* x, size_t dim, void* params_void)
   //std::cout << "cosThetaNu = " << cosThetaNu << ", visEn = " << visEn << std::endl;
   const double GammaHad = GammaTauToHad();
   const double M2 = 16.*TMath::Pi()*cube(tauLeptonMass)*GammaHad/(tauLeptonMass2 - visMass2);
-  double prob = (M2/(32.*square(TMath::Pi())*tauLeptonMass))*(1./visEn)*(X*tauEn2/tauP);
+  double prob = (M2/(32.*square(TMath::Pi())*tauEn))*(1./visEn)*(X*tauEn2/tauP);
   return prob;
 }
 
@@ -142,7 +142,7 @@ double gTF_lepTau(double* x, size_t dim, void* params_void)
   double visEn_rf = tauEn_rf - nunuMass;
   if ( !(tauEn_rf > 0. && visEn_rf > 0.) ) return 0.;
   double I = GFfactor*nunuMass2*(2.*tauEn_rf*visEn_rf - (2./3.)*TMath::Sqrt((square(tauEn_rf) - tauLeptonMass2)*(square(visEn_rf) - visMass2)));
-  double prob = (1./(32.*square(TMath::Pi())*tauLeptonMass))*(1./visEn)*I*(X*tauEn2/tauP);
+  double prob = (1./(32.*square(TMath::Pi())*tauEn))*(1./visEn)*I*(X*tauEn2/tauP);
   return prob;
 }
 
@@ -165,9 +165,9 @@ int main(int argc, char* argv[])
   checksToRun.push_back(kTF_lepTau);
   checksToRun.push_back(kTF_hadTau);
 
-  TH1* norm_met = new TH1D("norm_met", "norm_met", 1000, 0., 10.);
-  TH1* norm_lepTau = new TH1D("norm_lepTau", "norm_lepTau", 1000, 0., 10.);
-  TH1* norm_hadTau = new TH1D("norm_hadTau", "norm_hadTau", 1000, 0., 10.);
+  TH1* norm_met = new TH1D("norm_met", "norm_met", 10000, 0., 10.);
+  TH1* norm_lepTau = new TH1D("norm_lepTau", "norm_lepTau", 10000, 0., 10.);
+  TH1* norm_hadTau = new TH1D("norm_hadTau", "norm_hadTau", 10000, 0., 10.);
 
   int idxCheck = 0;
   for ( std::vector<int>::const_iterator checkToRun = checksToRun.begin();
@@ -175,7 +175,7 @@ int main(int argc, char* argv[])
     std::cout << "running check #" << idxCheck << ":" << std::endl;
     if ( (*checkToRun) == kTF_met ) {
       std::cout << "checking MET transfer function..." << std::endl;
-      int numToys = 100;
+      int numToys = 1000;
       double metResolution = 10.;
       TRandom3 rnd;
       for ( int idxToy = 0; idxToy < numToys; ++idxToy ) {
@@ -224,7 +224,7 @@ int main(int argc, char* argv[])
       }
     } else if ( (*checkToRun) == kTF_lepTau ) {
       std::cout << "checking transfer function for leptonic tau decays..." << std::endl;
-      int numToys = 100;
+      int numToys = 1000;
       TRandom3 rnd;
       for ( int idxToy = 0; idxToy < numToys; ++idxToy ) {
 	double tauP = rnd.Uniform(0., 100.);
@@ -233,7 +233,7 @@ int main(int argc, char* argv[])
 	//double tauP = 100.;
 	//double tauEta = 0.;
 	//double tauPhi = 0.;
-	std::cout << "tau: P = " << tauP << ", eta = " << tauEta << ", phi = " << tauPhi << std::endl;	
+	std::cout << "tau: P = " << tauP << ", eta = " << tauEta << ", phi = " << tauPhi << std::endl;		
 	int lepType = ( rnd.Uniform(0., 1.) > 0.5 ) ? kMuon : kElectron;
 	double visMass = ( lepType == kMuon ) ? muonMass : electronMass;
 	//double visMass = muonMass;
@@ -253,7 +253,9 @@ int main(int argc, char* argv[])
 	params[3] = visMass;
 	double normalizationErr;
 	double normalization = compIntegral(&gTF_lepTau, 3, xl, xu, params, normalizationErr);
-	double GammaLep = GammaTauToLep(lepType);
+	double tauEn = TMath::Sqrt(square(tauP) + tauLeptonMass2);
+	double gamma = tauEn/tauLeptonMass;
+	double GammaLep = GammaTauToLep(lepType)/gamma;
 	delete [] xl;
 	delete [] xu;
 	delete [] params;
@@ -263,7 +265,7 @@ int main(int argc, char* argv[])
       }
     } else if ( (*checkToRun) == kTF_hadTau ) {
       std::cout << "checking transfer function for hadronic tau decays..." << std::endl;
-      int numToys = 100;
+      int numToys = 1000;
       TRandom3 rnd;
       for ( int idxToy = 0; idxToy < numToys; ++idxToy ) {
 	double tauP = rnd.Uniform(0., 100.);
@@ -289,7 +291,9 @@ int main(int argc, char* argv[])
 	params[3] = visMass;
 	double normalizationErr;
 	double normalization = compIntegral(&gTF_hadTau, 2, xl, xu, params, normalizationErr);
-	const double GammaHad = GammaTauToHad();
+	double tauEn = TMath::Sqrt(square(tauP) + tauLeptonMass2);
+	double gamma = tauEn/tauLeptonMass;
+	double GammaHad = GammaTauToHad()/gamma;
 	delete [] xl;
 	delete [] xu;
 	delete [] params;

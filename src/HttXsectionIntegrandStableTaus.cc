@@ -47,8 +47,9 @@ HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus(const std::string
   madgraphMomenta_.push_back(madgraphTau2P4_);
 
   // set center-of-mass energy
-  s_ = square(sqrtS);
-  invSqrtS_ = 1./sqrtS;
+  sqrtS_ = sqrtS;
+  s_ = square(sqrtS_);
+  invSqrtS_ = 1./sqrtS_;
 
   // set global function pointer to this
   gHttXsectionIntegrandStableTaus = this;
@@ -60,6 +61,17 @@ HttXsectionIntegrandStableTaus::~HttXsectionIntegrandStableTaus()
   delete [] madgraphGluon2P4_;
   delete [] madgraphTau1P4_;
   delete [] madgraphTau2P4_;
+}
+
+namespace
+{
+  double compDgDp2z(double tau1Pt2, double tau1Pz, double tau2Pz)
+  {
+    double tau1Pz2 = square(tau1Pz);
+    double tau2Pz2 = square(tau2Pz);
+    if ( tau2Pz == 0. ) return 0.;
+    else return -2.*tau1Pz + 2.*TMath::Sqrt((tau1Pt2 + tau1Pz2)/(tau1Pt2 + tau2Pz2))*tau2Pz;
+  }
 }
 
 double
@@ -91,31 +103,32 @@ HttXsectionIntegrandStableTaus::Eval(const double* x) const
   double jacobiFactor = (square(q2 - mH2_) + mH2_*square(GammaH))/(mH_*GammaH); // dq2/dtk, taken from Eq. (8) in arXiv:1010.2263v3, with Pi factor removed from denominator after checking with Mathematica
 
   double tau2Px = -tau1Px;
-  double tau2Py = -tau1Py;  
+  double tau2Py = -tau1Py; 
   double term1 = q2 - 2.*tau1Pt2;
   double term22 = q2*(q2 - 4.*tau1Pt2);
   if ( term22 <= 0. || tau1Pt2 <= 0. ) return 0.;
   double term2 = TMath::Sqrt(term22);
   double tau2Pz_p = (tau1Pz*term1 + tau1P*term2)/(2.*tau1Pt2);
+  double absDgDp2z_p = TMath::Abs(compDgDp2z(tau1Pt2, tau1Pz, tau2Pz_p));
   double tau2Pz_m = (tau1Pz*term1 - tau1P*term2)/(2.*tau1Pt2);
-  
-  double jacobiFactor_p = jacobiFactor;
-  jacobiFactor_p *= (tau1Pz + tau1P*term1/term2)/(2.*tau1Pt2); // dtau2Pz/dq2 for positive sign, computed with Mathematica
-  jacobiFactor_p = TMath::Abs(jacobiFactor_p);
-  double prob_p = compProb(tau1Px, tau1Py, tau1Pz, tau2Px, tau2Py, tau2Pz_p, jacobiFactor_p);
-  if ( verbosity_ >= 2 ) {
-    std::cout << "solution+: tau2Pz = " << tau2Pz_p << ", prob = " << prob_p << std::endl;
+  double absDgDp2z_m = TMath::Abs(compDgDp2z(tau1Pt2, tau1Pz, tau2Pz_m));
+  double prob = 0.;
+  if ( TMath::Abs(tau2Pz_p) <= sqrtS_ && absDgDp2z_p != 0. ) { 
+    double prob_p = compProb(tau1Px, tau1Py, tau1Pz, tau2Px, tau2Py, tau2Pz_p, jacobiFactor/absDgDp2z_p);
+    if ( verbosity_ >= 2 ) {
+      std::cout << "solution+: tau2Pz = " << tau2Pz_p << ", prob = " << prob_p << std::endl;
+    }
+    prob += prob_p;
+  }
+  if ( TMath::Abs(tau2Pz_m) <= sqrtS_ && absDgDp2z_m != 0. ) { 
+    double prob_m = compProb(tau1Px, tau1Py, tau1Pz, tau2Px, tau2Py, tau2Pz_m, jacobiFactor/absDgDp2z_m);
+    if ( verbosity_ >= 2 ) {
+      std::cout << "solution-: tau2Pz = " << tau2Pz_m << ", prob = " << prob_m << std::endl;
+    }
+    prob += prob_m;
   }
 
-  double jacobiFactor_m = jacobiFactor;
-  jacobiFactor_m *= (tau1Pz - tau1P*term1/term2)/(2.*tau1Pt2); // dtau2Pz/dq2 for negative sign, computed with Mathematica
-  jacobiFactor_m = TMath::Abs(jacobiFactor_m);
-  double prob_m = compProb(tau1Px, tau1Py, tau1Pz, tau2Px, tau2Py, tau2Pz_m, jacobiFactor_m);
-  if ( verbosity_ >= 2 ) {
-    std::cout << "solution-: tau2Pz = " << tau2Pz_m << ", prob = " << prob_m << std::endl;
-  }
-
-  return prob_p + prob_m;
+  return prob;
 }
 
 double
@@ -135,6 +148,7 @@ HttXsectionIntegrandStableTaus::compProb(double tau1Px, double tau1Py, double ta
   if ( xa <= 0. || xa >= 1. ) return 0.;
   if ( xb <= 0. || xb >= 1. ) return 0.;
   double Q = ditauMass;
+  //std::cout << "Q = " << Q << std::endl;
   assert(pdfIsInitialized_);
   double fa = LHAPDF::xfx(1, xa, Q, 0)/xa;
   double fb = LHAPDF::xfx(1, xb, Q, 0)/xb;
