@@ -21,6 +21,9 @@ bool HttXsectionIntegrandWithTauDecays::pdfIsInitialized_ = false;
 
 HttXsectionIntegrandWithTauDecays::HttXsectionIntegrandWithTauDecays(const std::string& madgraphFileName, double sqrtS, const std::string& pdfFileName, int verbosity) 
   : mTest2_(0.),
+    GammaH_(0.),
+    s_(square(sqrtS)),
+    invSqrtS_(1./sqrtS),
     beamAxis_(0., 0., 1.),
     invCovMET_(2,2),
     shiftVisPt_(false),
@@ -34,6 +37,8 @@ HttXsectionIntegrandWithTauDecays::HttXsectionIntegrandWithTauDecays(const std::
     idxLeg2_phi_(-1),
     idxLeg2VisPtShift_(-1),
     idxLeg2_mNuNu_(-1),
+    me_madgraph_(false),
+    me_lit_(false),
     verbosity_(verbosity)
 {
   if ( verbosity_ ) {
@@ -47,7 +52,12 @@ HttXsectionIntegrandWithTauDecays::HttXsectionIntegrandWithTauDecays(const std::
   }
 
   // initialize Madgraph
-  madgraph_.initProc(madgraphFileName);
+  me_madgraph_.initProc(madgraphFileName);
+
+  me_lit_.setS(s_);
+  me_lit_.setHiggsMass(mTest_);
+  me_lit_.setHiggsWidth(GammaH_);
+  me_lit_.setBR(1.);
 
   madgraphGluon1P4_ = new double[4];
   madgraphGluon1P4_[1] = 0.;
@@ -61,10 +71,6 @@ HttXsectionIntegrandWithTauDecays::HttXsectionIntegrandWithTauDecays(const std::
   madgraphMomenta_.push_back(madgraphTau1P4_);
   madgraphTau2P4_ = new double[4];
   madgraphMomenta_.push_back(madgraphTau2P4_);
-
-  // set center-of-mass energy
-  s_ = square(sqrtS);
-  invSqrtS_ = 1./sqrtS;
 
   // set global function pointer to this
   gHttXsectionIntegrandWithTauDecays = this;
@@ -83,6 +89,9 @@ HttXsectionIntegrandWithTauDecays::setMtest(double mTest)
 { 
   mTest_ = mTest; 
   mTest2_ = square(mTest); 
+  
+  //GammaH_ = 1.e-2*mTest;
+  GammaH_ = 1.;
 }
 
 void 
@@ -198,7 +207,7 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   leg1eY_z_ = eY1.z();
   leg1eZ_x_ = eZ1.x();
   leg1eZ_y_ = eZ1.y();
-  leg1eX_z_ = eZ1.z();
+  leg1eZ_z_ = eZ1.z();
   double vis1En    = visPtShift1*x[0];
   double vis1P     = TMath::Sqrt(TMath::Max(0., vis1En*vis1En - leg1Mass2_));
   double vis1Px    = vis1P*eZ1.x();
@@ -220,7 +229,7 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   leg2eY_z_ = eY2.z();
   leg2eZ_x_ = eZ2.x();
   leg2eZ_y_ = eZ2.y();
-  leg2eX_z_ = eZ2.z();
+  leg2eZ_z_ = eZ2.z();
   double vis2En    = visPtShift2*(x[3]/(2.*vis1En*TMath::Max(1.e-2, 1. - compScalarProduct(eZ1, eZ2))));
   double vis2P     = TMath::Sqrt(TMath::Max(0., vis2En*vis2En - leg2Mass2_));
   double vis2Px    = vis2P*eZ2.x();
@@ -233,53 +242,72 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
 
   assert(idxLeg2_X_ != -1);
   double x2 = x[idxLeg2_X_];
+  //std::cout << "x2 = " << x2 << std::endl;
   if ( !(x2 >= 1.e-5 && x2 <= 1.) ) return 0.;
   
+  //GammaH_ = me_madgraph_.getHiggsWidth();
+  double GammaH_times_mH = GammaH_*mTest_;
+  double tk = x[idxLeg1_t_];
+  double q2 = mTest2_ + GammaH_times_mH*TMath::Tan(tk);
+  //std::cout << "tk = " << tk << ": q2 = " << q2 << " (mVis2 = " << mVis2 << ", visPtShift1 = " << visPtShift1 << ", visPtShift2 = " << visPtShift2 << ")" << std::endl;
+  if ( q2 <= 0. ) return 0.;
+  
   assert(idxLeg1_t_ != -1);  
-  double x1 = (mVis2*visPtShift1*visPtShift2)/((mTest2_ + 1.e-2*mTest2_*TMath::Tan(x[idxLeg1_t_]))*x2);
+  double x1 = (mVis2*visPtShift1*visPtShift2)/(q2*x2);
+  //std::cout << "x1 = " << x1 << std::endl;
   if ( !(x1 >= 1.e-5 && x1 <= 1.) ) return 0.;
 
   // compute neutrino and tau lepton four-vector for first tau
   double nu1En    = vis1En*(1. - x1)/x1;
   double nu1Mass  = ( idxLeg1_mNuNu_ != -1 ) ? TMath::Sqrt(x[idxLeg1_mNuNu_]) : 0.;
   double nu1P     = TMath::Sqrt(TMath::Max(0., nu1En*nu1En - square(nu1Mass)));
+  //std::cout << "nu1P = " << nu1P << std::endl;
   assert(idxLeg1_phi_ != -1);  
   double phiNu1 = x[idxLeg1_phi_];
   double cosThetaNu1 = compCosThetaNu(vis1En, vis1P, leg1Mass2_, nu1En, nu1P, square(nu1Mass));
+  //std::cout << "cosThetaNu1 = " << cosThetaNu1 << std::endl;
   if ( !(cosThetaNu1 >= -1. && cosThetaNu1 <= +1.) ) return 0.;
   double thetaNu1 = TMath::ACos(cosThetaNu1);
   double nu1Px_local = nu1P*TMath::Cos(phiNu1)*TMath::Sin(thetaNu1);
   double nu1Py_local = nu1P*TMath::Sin(phiNu1)*TMath::Sin(thetaNu1);
   double nu1Pz_local = nu1P*TMath::Cos(thetaNu1);
+  //std::cout << "nu1_local: Px = " << nu1Px_local << ", Py = " << nu1Py_local << ", Pz = " << nu1Pz_local << std::endl;
   double nu1Px = nu1Px_local*leg1eX_x_ + nu1Py_local*leg1eY_x_ + nu1Pz_local*leg1eZ_x_;
   double nu1Py = nu1Px_local*leg1eX_y_ + nu1Py_local*leg1eY_y_ + nu1Pz_local*leg1eZ_y_;
   double nu1Pz = nu1Px_local*leg1eX_z_ + nu1Py_local*leg1eY_z_ + nu1Pz_local*leg1eZ_z_;
+  //std::cout << "nu1: Px = " << nu1Px << ", Py = " << nu1Py << ", Pz = " << nu1Pz << std::endl;
 
   double tau1En = vis1En + nu1En;
   double tau1Px = vis1Px + nu1Px;
   double tau1Py = vis1Py + nu1Py;
   double tau1Pz = vis1Pz + nu1Pz;
+  //std::cout << "tau1: Px = " << tau1Px << ", Py = " << tau1Py << ", Pz = " << tau1Pz << std::endl;
   
   // compute neutrino and tau lepton four-vector for second tau
   double nu2En    = vis2En*(1. - x2)/x2;
   double nu2Mass  = ( idxLeg2_mNuNu_ != -1 ) ? TMath::Sqrt(x[idxLeg2_mNuNu_]) : 0.;
   double nu2P     = TMath::Sqrt(TMath::Max(0., nu2En*nu2En - square(nu2Mass)));
+  //std::cout << "nu2P = " << nu2P << std::endl;
   assert(idxLeg2_phi_ != -2);  
   double phiNu2 = x[idxLeg2_phi_];
   double cosThetaNu2 = compCosThetaNu(vis2En, vis2P, leg2Mass2_, nu2En, nu2P, square(nu2Mass));
   if ( !(cosThetaNu2 >= -1. && cosThetaNu2 <= +1.) ) return 0.;
+  //std::cout << "cosThetaNu2 = " << cosThetaNu2 << std::endl;
   double thetaNu2 = TMath::ACos(cosThetaNu2);
   double nu2Px_local = nu2P*TMath::Cos(phiNu2)*TMath::Sin(thetaNu2);
   double nu2Py_local = nu2P*TMath::Sin(phiNu2)*TMath::Sin(thetaNu2);
   double nu2Pz_local = nu2P*TMath::Cos(thetaNu2);
+  //std::cout << "nu2_local: Px = " << nu2Px_local << ", Py = " << nu2Py_local << ", Pz = " << nu2Pz_local << std::endl;
   double nu2Px = nu2Px_local*leg2eX_x_ + nu2Py_local*leg2eY_x_ + nu2Pz_local*leg2eZ_x_;
   double nu2Py = nu2Px_local*leg2eX_y_ + nu2Py_local*leg2eY_y_ + nu2Pz_local*leg2eZ_y_;
   double nu2Pz = nu2Px_local*leg2eX_z_ + nu2Py_local*leg2eY_z_ + nu2Pz_local*leg2eZ_z_;
+  //std::cout << "nu2: Px = " << nu2Px << ", Py = " << nu2Py << ", Pz = " << nu2Pz << std::endl;
 
   double tau2En = vis2En + nu2En;
   double tau2Px = vis2Px + nu2Px;
   double tau2Py = vis2Py + nu2Py;
   double tau2Pz = vis2Pz + nu2Pz;
+  //std::cout << "tau2: Px = " << tau2Px << ", Py = " << tau2Py << ", Pz = " << tau2Pz << std::endl;
 
   // evaluate transfer function for MET/hadronic recoil
   double residualX = x[6];
@@ -292,20 +320,29 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   double prob_TF = const_MET_*TMath::Exp(-0.5*pull2);
 
   double prob_acceptance = 1.;
-  if ( acceptance_ ) prob_acceptance *= (*acceptance_)(vis1P4, vis2P4, measuredMETx, measuredMETy);
-  
+  if ( acceptance_ ) {
+    prob_acceptance *= (*acceptance_)(vis1P4, vis2P4, measuredMETx, measuredMETy);
+  }
+
   // evaluate transfer functions for tau energy reconstruction
   if ( idxLeg1VisPtShift_ != -1 && !leg1isLep_ ) prob_TF *= extractProbFromLUT(x[idxLeg1VisPtShift_], leg1lutVisPtRes_);
   if ( idxLeg2VisPtShift_ != -1 && !leg2isLep_ ) prob_TF *= extractProbFromLUT(x[idxLeg2VisPtShift_], leg2lutVisPtRes_);
 
   // compute Bjorken-x of incoming protons and evaluate PDF factor
+  double ditauPx = tau1Px + tau2Px;
+  double ditauPy = tau1Py + tau2Py;
   double ditauPz = tau1Pz + tau2Pz;
   double ditauEn = tau1En + tau2En;
+  double ditauMass = TMath::Sqrt(square(ditauEn) - (square(ditauPx) + square(ditauPy) + square(ditauPz)));
+  //if ( !(ditauMass > 0.70*mH_ && ditauMass < 1.30*mH_) ) return 0.;
+  //std::cout << "ditau: En = " << ditauEn << ", Pz = " << ditauPz << std::endl;
   double xa = invSqrtS_*(ditauEn + ditauPz);
-  double xb = invSqrtS_*(ditauEn - ditauPz);    
+  double xb = invSqrtS_*(ditauEn - ditauPz);   
+  //std::cout << "xa = " << xa << ", xb = " << xb << std::endl;
   if ( xa <= 0. || xa >= 1. ) return 0.;
   if ( xb <= 0. || xb >= 1. ) return 0.;
-  double Q = mTest_;
+  //double Q = mTest_;
+  double Q = ditauMass;
   assert(pdfIsInitialized_);
   double fa = LHAPDF::xfx(1, xa, Q, 0)/xa;
   double fb = LHAPDF::xfx(1, xb, Q, 0)/xb;
@@ -313,7 +350,7 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
 
   // evaluate flux factor
   double prob_flux = (1./(s_*xa*xb));  
-  
+
   // perform boost into MEM frame and evaluate LO matrix element, 
   // computed by Madgraph
   LorentzVector tau1P4(tau1Px, tau1Py, tau1Pz, tau1En);
@@ -336,20 +373,26 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   madgraphTau2P4_[1] = tau2P4_rf.px();
   madgraphTau2P4_[2] = tau2P4_rf.py();
   madgraphTau2P4_[3] = tau2P4_rf.pz();
-  //madgraph_.setHiggsMass(mTest_);
-  //madgraph_.setHiggsWidth(1.e-2*mTest_);
-  madgraph_.setMomenta(madgraphMomenta_);
-  madgraph_.sigmaKin();
-  double prob_ME = madgraph_.getMatrixElements()[0];
-  if ( TMath::IsNaN(prob_ME) ) {
-    std::cerr << "Warning: Magraph returned NaN --> skipping event !!" << std::endl;
-    std::cerr << " tau1: Pt = " << tau1P4.pt() << ", eta = " << tau1P4.eta() << ", phi = " << tau1P4.phi() << ", mass = " << tau1P4.mass() << std::endl;
-    std::cerr << " tau2: Pt = " << tau2P4.pt() << ", eta = " << tau2P4.eta() << ", phi = " << tau2P4.phi() << ", mass = " << tau2P4.mass() << std::endl;
-    return 0.;
-  }
+  me_madgraph_.setMomenta(madgraphMomenta_);
+  me_madgraph_.sigmaKin();
+  //double prob_ME = me_madgraph_.getMatrixElements()[0];
+  //if ( TMath::IsNaN(prob_ME) ) {
+  //  std::cerr << "Warning: Magraph returned NaN --> skipping event !!" << std::endl;
+  //  std::cerr << " tau1: Pt = " << tau1P4.pt() << ", eta = " << tau1P4.eta() << ", phi = " << tau1P4.phi() << ", mass = " << tau1P4.mass() << std::endl;
+  //  std::cerr << " tau2: Pt = " << tau2P4.pt() << ", eta = " << tau2P4.eta() << ", phi = " << tau2P4.phi() << ", mass = " << tau2P4.mass() << std::endl;
+  //  return 0.;
+  //}
+  me_lit_.setHiggsMass(mTest_);
+  me_lit_.setHiggsWidth(GammaH_);
+  me_lit_.setMomenta(madgraphMomenta_);
+  double prob_ME = me_lit_.getMatrixElement();
+  //std::cout << "prob_ME: madgraph = " << me_madgraph_.getMatrixElements()[0] << ", lit = " << (1./16.)*me_lit_.getMatrixElement() << std::endl;
+  assert(prob_ME >= 0.);
   
-  const double twoPiFactor = 1./sixth(2.*TMath::Pi());
-  double prob_PS_and_tauDecay = twoPiFactor*twoPiFactor;
+  const double hbar_c = 0.1973; // GeV fm
+  const double conversionFactor = 1.e+10*square(hbar_c); // conversion factor from GeV^-2 to picobarn = 10^-40m
+  const double constFactor = conversionFactor/eigth(2.*TMath::Pi());
+  double prob_PS_and_tauDecay = constFactor;
   if ( leg1isLep_ ) {
     prob_PS_and_tauDecay *= compPSfactor_tauToLepDecay(x1, vis1En, vis1P, leg1Mass_, nu1En, nu1P, nu1Mass);
   } else {
@@ -360,13 +403,12 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   } else {
     prob_PS_and_tauDecay *= compPSfactor_tauToHadDecay(x2, vis2En, vis2P, leg2Mass_, nu2En, nu2P);
   }
+  prob_PS_and_tauDecay *= (1./(4.*tau1En*tau2En));
 
-  double Gamma_times_m = 1.e-2*mTest_*mTest_;
-  double q2 = mTest2_ + 1.e-2*mTest2_*TMath::Tan(x[idxLeg1_t_]);
-  double jacobiFactor = ((2.*mVis2*visPtShift1*visPtShift2)/(square(q2)*x2))*(square(comSystem.M2() - mTest2_) + square(Gamma_times_m))/Gamma_times_m; 
+  double jacobiFactor = ((2.*mVis2*visPtShift1*visPtShift2)/(square(q2)*x2))*(square(comSystem.M2() - mTest2_) + square(GammaH_times_mH))/GammaH_times_mH; 
   jacobiFactor *= square(vis1P)*TMath::Sin(vis1Theta);
   jacobiFactor *= square(vis2P)*TMath::Sin(vis2Theta);
-  jacobiFactor *= (1./(2.*vis1En*TMath::Max(1.e-2, 1. - compScalarProduct(eZ1, eZ2))));
+  jacobiFactor *= (1./(2.*vis1En*vis2En*TMath::Max(1.e-2, 1. - compScalarProduct(eZ1, eZ2))));
   if ( idxLeg1VisPtShift_ != -1 && !leg1isLep_ ) jacobiFactor *= vis1P4.pt();
   if ( idxLeg2VisPtShift_ != -1 && !leg2isLep_ ) jacobiFactor *= vis2P4.pt();
 

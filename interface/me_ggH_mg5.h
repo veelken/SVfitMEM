@@ -26,10 +26,12 @@ class me_ggH_mg5
   public:
 
     // Constructor.
-    me_ggH_mg5() {}
+    me_ggH_mg5(bool applyNWA = false)
+      : applyNWA_(applyNWA)
+    {}
 
     // Initialize process.
-    virtual void initProc(string param_card_name); 
+    virtual void initProc(const string& param_card_name); 
 
     // Calculate flavour-independent parts of cross section.
     virtual void sigmaKin(); 
@@ -38,7 +40,7 @@ class me_ggH_mg5
     virtual double sigmaHat(); 
 
     // Info on the subprocess.
-    virtual string name() const {return "g g > ta- ta+ (heft)";}
+    virtual string name() const { return "g g > ta- ta+ (heft)"; }
 
     //void setHiggsMass(double mH) 
     //{ 
@@ -82,17 +84,17 @@ class me_ggH_mg5
       return pars->mdl_WH;
     } 
 
-    virtual int code() const {return 0;}
+    virtual int code() const { return 0; }
 
-    const vector<double> & getMasses() const {return mME;}
+    const vector<double>& getMasses() const { return mME; }
 
     // Get and set momenta for matrix element evaluation
-    vector < double * > getMomenta(){return p;}
-    void setMomenta(vector < double * > & momenta){p = momenta;}
-    void setInitial(int inid1, int inid2){id1 = inid1; id2 = inid2;}
+    std::vector<double*> getMomenta() { return p; }
+    void setMomenta(std::vector<double*>& momenta){ p = momenta; }
+    void setInitial(int inid1, int inid2) { id1 = inid1; id2 = inid2; }
 
     // Get matrix element vector
-    const double * getMatrixElements() const {return matrix_element;}
+    const double * getMatrixElements() const { return matrix_element; }
 
     // Constants for array limits
     static const int ninitial = 2; 
@@ -100,6 +102,8 @@ class me_ggH_mg5
     static const int nprocesses = 1; 
 
   private:
+
+    bool applyNWA_;
 
     // Private functions to calculate the matrix element for all subprocesses
     // Calculate wavefunctions
@@ -120,14 +124,12 @@ class me_ggH_mg5
     Parameters_heft * pars; 
 
     // vector with external particle masses
-    vector<double> mME; 
+    std::vector<double> mME; 
 
     // vector with momenta (to be changed each event)
-    vector < double * > p; 
+    std::vector<double*> p; 
     // Initial particle ids
     int id1, id2; 
-
 }; 
-
 
 #endif  // MG5_Sigma_heft_gg_tamtap_H

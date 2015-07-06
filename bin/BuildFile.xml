@@ -4,6 +4,12 @@
   <use name="rootcintex"/>
   <use name="root"/>
 </bin>
+<bin   file="testHttXsectionStableHiggs.cc" name="testHttXsectionStableHiggs">
+  <use name="FWCore/ParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
 <bin   file="testHttXsectionStableTaus.cc" name="testHttXsectionStableTaus">
   <use name="FWCore/ParameterSet"/>
   <use name="TauAnalysis/SVfitMEM"/>

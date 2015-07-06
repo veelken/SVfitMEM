@@ -1,8 +1,9 @@
 #ifndef TauAnalysis_SVfitMEM_HttXsectionIntegrandWithTauDecays_h
 #define TauAnalysis_SVfitMEM_HttXsectionIntegrandWithTauDecays_h
 
-#include "TauAnalysis/SVfitMEM/interface/me_ggH_mg5.h"
 #include "TauAnalysis/SVfitMEM/interface/svFitAuxFunctions.h"
+#include "TauAnalysis/SVfitMEM/interface/me_ggH_mg5.h"
+#include "TauAnalysis/SVfitMEM/interface/me_ggH_lit.h"
 
 #include <TMatrixD.h>
 
@@ -14,15 +15,18 @@ namespace svFitMEM
     HttXsectionIntegrandWithTauDecays(const std::string&, double, const std::string&, int);
     ~HttXsectionIntegrandWithTauDecays();
   
+    /// set Higgs -> tautau decay branching fraction
+    void setBR(double br) { me_lit_.setBR(br); }
+
     /// enable/disable acceptance cuts
     void enableAcceptanceCuts(double (*acceptance)(const LorentzVector&, const LorentzVector&, double, double))
     {
-      std::cout << "<HttXsectionIntegrandWithTauDecays::enableAcceptanceCuts>: acceptance = " << acceptance << std::endl;
+      //std::cout << "<HttXsectionIntegrandWithTauDecays::enableAcceptanceCuts>: acceptance = " << &acceptance << std::endl;
       acceptance_ = acceptance;      
     }
     void disableAcceptanceCuts()
     {
-      std::cout << "<HttXsectionIntegrandWithTauDecays::disableAcceptanceCuts>:" << std::endl;
+      //std::cout << "<HttXsectionIntegrandWithTauDecays::disableAcceptanceCuts>:" << std::endl;
       acceptance_ = 0;
     }
 
@@ -79,6 +83,8 @@ namespace svFitMEM
     double mTest_;
     double mTest2_;
 
+    mutable double GammaH_;
+
     double s_;
     double invSqrtS_;
     Vector beamAxis_;
@@ -106,7 +112,8 @@ namespace svFitMEM
 
     static bool pdfIsInitialized_;
 
-    mutable me_ggH_mg5 madgraph_;
+    mutable me_ggH_mg5 me_madgraph_;
+    mutable me_ggH_lit me_lit_;
     double* madgraphGluon1P4_;
     double* madgraphGluon2P4_;
     double* madgraphTau1P4_;

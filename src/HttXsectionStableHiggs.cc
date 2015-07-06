@@ -1,4 +1,4 @@
-#include "TauAnalysis/SVfitMEM/interface/HttXsectionStableTaus.h"
+#include "TauAnalysis/SVfitMEM/interface/HttXsectionStableHiggs.h"
 
 #include <TGraphErrors.h>
 #include <TH1.h>
@@ -11,69 +11,55 @@ namespace
 {
   double g(double* x, size_t dim, void* param)
   {    
-    return HttXsectionIntegrandStableTaus::gHttXsectionIntegrandStableTaus->Eval(x);
+    return HttXsectionIntegrandStableHiggs::gHttXsectionIntegrandStableHiggs->Eval(x);
   }
 }
 
-HttXsectionStableTaus::HttXsectionStableTaus(const std::string& madgraphFileName, double sqrtS, double mH, const std::string& pdfFileName, int verbosity) 
+HttXsectionStableHiggs::HttXsectionStableHiggs(const std::string& madgraphFileName, double sqrtS, double mH, const std::string& pdfFileName, bool applyNWA, int verbosity) 
   : integrand_(0),
     sqrtS_(sqrtS),
     mH_(mH),
+    applyNWA_(applyNWA),
     vegasIntegrand_(0),
     vegasWorkspace_(0),
     vegasRnd_(0),
-    //numCallsGridOpt_(10000),
-    //numCallsIntEval_(40000),
-    numCallsGridOpt_(2000),
-    numCallsIntEval_(8000),
+    numCallsGridOpt_(10000),
+    numCallsIntEval_(40000),
+    //numCallsGridOpt_(2000),
+    //numCallsIntEval_(8000),
     maxChi2_(2.),
     //maxIntEvalIter_(20),
     maxIntEvalIter_(5),
     precision_(1.e-2),
-    numDimensions_(4),
     xl_(0),
     xu_(0),
     verbosity_(verbosity)
 { 
-  integrand_ = new HttXsectionIntegrandStableTaus(madgraphFileName, sqrtS_, mH_, pdfFileName, verbosity_);
+  integrand_ = new HttXsectionIntegrandStableHiggs(madgraphFileName, sqrtS_, mH_, pdfFileName, applyNWA_, verbosity_);
+
+  numDimensions_ = ( applyNWA_ ) ? 1 : 2;
 
   clock_ = new TBenchmark();
 }
 
-HttXsectionStableTaus::~HttXsectionStableTaus() 
+HttXsectionStableHiggs::~HttXsectionStableHiggs() 
 {
   delete integrand_;
 
   delete clock_;
 }
 
-void HttXsectionStableTaus::setBR(double br)
-{
-  //integrand_->setBR(br);
-  //return;
-  //std::cout << "<HttXsectionStableTaus::setBR>:" << std::endl;
-  //std::cout << " mH = " << mH_ << ": GammaH = " << integrand_->GammaH() << ", br = " << br << std::endl;
-  double me2_1 = 16.*TMath::Pi()*integrand_->GammaH()*br*mH_ /* *2./3. */;
-  //const double v2 = square(246.22); // GeV^2
-  //double me2_2 = 2.*(tauLeptonMass2/v2)*square(mH_)*(1. - 4.*tauLeptonMass2/square(mH_));
-  //std::cout << "me2: (1) = " << me2_1 << ", (2) = " << me2_2 << std::endl;
-  const double one_over_Pi = 1./TMath::Pi();
-  double GammaH_times_mH = integrand_->GammaH()*mH_;
-  me2_1 /= (one_over_Pi*GammaH_times_mH);
-  integrand_->setBR(me2_1);
-}
-
 void
-HttXsectionStableTaus::integrate()
+HttXsectionStableHiggs::integrate()
 {
   if ( verbosity_ >= 1 ) {
-    std::cout << "<HttXsectionStableTaus::integrate>:" << std::endl;
+    std::cout << "<HttXsectionStableHiggs::integrate>:" << std::endl;
   }
   if ( verbosity_ >= 0 ) {
-    clock_->Start("<HttXsectionStableTaus::integrate>");
+    clock_->Start("<HttXsectionStableHiggs::integrate>");
   }
   
-  HttXsectionIntegrandStableTaus::gHttXsectionIntegrandStableTaus = integrand_;
+  HttXsectionIntegrandStableHiggs::gHttXsectionIntegrandStableHiggs = integrand_;
 
   vegasIntegrand_ = new gsl_monte_function;
   vegasIntegrand_->f = &g;
@@ -86,15 +72,12 @@ HttXsectionStableTaus::integrate()
   
   xl_ = new double[numDimensions_];
   xu_ = new double[numDimensions_];
-  xl_[0] = -1.0*0.5*mH_;     // tau1Px
-  xu_[0] = +1.0*0.5*mH_;
-  xl_[1] = -1.0*0.5*mH_;     // tau1Py
-  xu_[1] = +1.0*0.5*mH_;
-  xl_[2] = -sqrtS_;          // tau1Pz 
-  xu_[2] = +sqrtS_;
-  xu_[2] = +1.e+3;
-  xl_[3] = -0.5*TMath::Pi(); // tk, as defined by Eq. (8) in arXiv:1010.2263v3
-  xu_[3] = +0.5*TMath::Pi();
+  xl_[0] = 0.;
+  xu_[0] = 1.;
+  if ( !applyNWA_ ) {
+    xl_[1] = -0.5*TMath::Pi(); // tk, as defined by Eq. (8) in arXiv:1010.2263v3
+    xu_[1] = +0.5*TMath::Pi();
+  }
 
   gsl_monte_vegas_init(vegasWorkspace_);
   xSection_ = 0.;
@@ -130,6 +113,6 @@ HttXsectionStableTaus::integrate()
   gsl_rng_free(vegasRnd_);
 
   if ( verbosity_ >= 0 ) {
-    clock_->Show("<HttXsectionStableTaus::integrate>");
+    clock_->Show("<HttXsectionStableHiggs::integrate>");
   }
 }

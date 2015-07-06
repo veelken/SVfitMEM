@@ -1,5 +1,5 @@
-#ifndef TauAnalysis_SVfitMEM_HttXsectionIntegrandStableTaus_h
-#define TauAnalysis_SVfitMEM_HttXsectionIntegrandStableTaus_h
+#ifndef TauAnalysis_SVfitMEM_HttXsectionIntegrandStableHiggs_h
+#define TauAnalysis_SVfitMEM_HttXsectionIntegrandStableHiggs_h
 
 #include "TauAnalysis/SVfitMEM/interface/svFitAuxFunctions.h"
 #include "TauAnalysis/SVfitMEM/interface/me_ggH_mg5.h"
@@ -9,14 +9,11 @@
 
 namespace svFitMEM
 {
-  class HttXsectionIntegrandStableTaus 
+  class HttXsectionIntegrandStableHiggs
   {
    public:
-    HttXsectionIntegrandStableTaus(const std::string&, double, double, const std::string&, int);
-    ~HttXsectionIntegrandStableTaus();
-  
-    /// set Higgs -> tautau decay branching fraction
-    void setBR(double br) { me_lit_.setBR(br); }
+    HttXsectionIntegrandStableHiggs(const std::string&, double, double, const std::string&, bool, int);
+    ~HttXsectionIntegrandStableHiggs();
   
     /// evaluate integrand for given value of integration variables x
     double Eval(const double* x) const;
@@ -25,18 +22,18 @@ namespace svFitMEM
     double GammaH() const { return me_madgraph_.getHiggsWidth(); }	
 
     /// static pointer to this (needed for interfacing the likelihood function calls to VEGAS integration)
-    static const HttXsectionIntegrandStableTaus* gHttXsectionIntegrandStableTaus;
+    static const HttXsectionIntegrandStableHiggs* gHttXsectionIntegrandStableHiggs;
 
    protected:
-    double compProb(double, double, double, double, double, double, double) const;
-
     double mH_;
     double mH2_;
-    mutable double GammaH_;
 
     double sqrtS_;
     double s_;
     double invSqrtS_;
+
+    bool applyNWA_;
+
     Vector beamAxis_;
 
     static bool pdfIsInitialized_;

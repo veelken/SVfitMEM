@@ -17,12 +17,18 @@ bool HttXsectionIntegrandStableTaus::pdfIsInitialized_ = false;
 HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus(const std::string& madgraphFileName, double sqrtS, double mH, const std::string& pdfFileName, int verbosity) 
   : mH_(mH),
     mH2_(mH*mH),
+    GammaH_(1.e-2*mH_),
+    sqrtS_(sqrtS),
+    s_(square(sqrtS_)),
+    invSqrtS_(1./sqrtS_),
     beamAxis_(0., 0., 1.),
+    me_madgraph_(false),
+    me_lit_(false),
     verbosity_(verbosity)
 {
-  if ( verbosity_ ) {
+  //if ( verbosity_ ) {
     std::cout << "<HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus>:" << std::endl;
-  }
+  //}
 
   // initialize PDF set
   if ( !pdfIsInitialized_ ) {
@@ -31,7 +37,16 @@ HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus(const std::string
   }
 
   // initialize Madgraph
-  madgraph_.initProc(madgraphFileName);
+  me_madgraph_.initProc(madgraphFileName);
+  //GammaH_ = me_madgraph_.getHiggsWidth();
+  //std::cout << "mH = " << mH_ << ": GammaH = " << GammaH_ << std::endl;
+
+  me_lit_.setS(s_);
+  me_lit_.setHiggsMass(mH_);
+  me_lit_.setHiggsWidth(GammaH_);
+  me_lit_.setBR(1.);
+  //const double v2 = square(246.22); // GeV^2
+  //me_lit_.setBR(2.*tauLeptonMass2/v2)*square(mH_)*(1. - 4.*tauLeptonMass2/square(mH_))); // square of Higgs-tau Yukawa coupling
 
   madgraphGluon1P4_ = new double[4];
   madgraphGluon1P4_[1] = 0.;
@@ -45,11 +60,6 @@ HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus(const std::string
   madgraphMomenta_.push_back(madgraphTau1P4_);
   madgraphTau2P4_ = new double[4];
   madgraphMomenta_.push_back(madgraphTau2P4_);
-
-  // set center-of-mass energy
-  sqrtS_ = sqrtS;
-  s_ = square(sqrtS_);
-  invSqrtS_ = 1./sqrtS_;
 
   // set global function pointer to this
   gHttXsectionIntegrandStableTaus = this;
@@ -87,20 +97,20 @@ HttXsectionIntegrandStableTaus::Eval(const double* x) const
   double tau1Px2 = square(tau1Px);
   double tau1Py2 = square(tau1Py);
   double tau1Pt2 = tau1Px2 + tau1Py2;
+  //if ( tau1Pt2 > (0.25*mH2_) ) return 0.;
   double tau1Pz2 = square(tau1Pz);
   double tau1P2 = tau1Px2 + tau1Py2 + tau1Pz2;
   double tau1P = TMath::Sqrt(tau1P2);
   double tk = x[3];
 
-  double GammaH = madgraph_.getHiggsWidth();
-  if ( TMath::Abs(madgraph_.getHiggsMass() - mH_) > 1.e-3*mH_ ) {
-    std::cerr << "Error: Higgs mass defined in Madgraph = " << madgraph_.getHiggsMass() << " does not match mH = " << mH_ << " !!" << std::endl;
+  //GammaH_ = me_madgraph_.getHiggsWidth();
+  if ( TMath::Abs(me_madgraph_.getHiggsMass() - mH_) > 1.e-3*mH_ ) {
+    std::cerr << "Error: Higgs mass defined in Madgraph = " << me_madgraph_.getHiggsMass() << " does not match mH = " << mH_ << " !!" << std::endl;
     assert(0);
   }
-  double q2 = mH2_ + mH_*GammaH*TMath::Tan(tk);
+  double q2 = mH2_ + mH_*GammaH_*TMath::Tan(tk);
   if ( q2 <= 0. ) return 0.;
-  double q = TMath::Sqrt(q2);
-  double jacobiFactor = (square(q2 - mH2_) + mH2_*square(GammaH))/(mH_*GammaH); // dq2/dtk, taken from Eq. (8) in arXiv:1010.2263v3, with Pi factor removed from denominator after checking with Mathematica
+  double jacobiFactor = (square(q2 - mH2_) + mH2_*square(GammaH_))/(mH_*GammaH_); // dq2/dtk, taken from Eq. (8) in arXiv:1010.2263v3, with Pi factor removed from denominator after checking with Mathematica
 
   double tau2Px = -tau1Px;
   double tau2Py = -tau1Py; 
@@ -143,12 +153,13 @@ HttXsectionIntegrandStableTaus::compProb(double tau1Px, double tau1Py, double ta
   double ditauPz = tau1Pz + tau2Pz;
   double ditauEn = tau1En + tau2En;
   double ditauMass = TMath::Sqrt(square(ditauEn) - (square(ditauPx) + square(ditauPy) + square(ditauPz)));
+  //if ( !(ditauMass > 0.70*mH_ && ditauMass < 1.30*mH_) ) return 0.;
   double xa = invSqrtS_*(ditauEn + ditauPz);
   double xb = invSqrtS_*(ditauEn - ditauPz);   
   if ( xa <= 0. || xa >= 1. ) return 0.;
   if ( xb <= 0. || xb >= 1. ) return 0.;
+  //double Q = mH_;
   double Q = ditauMass;
-  //std::cout << "Q = " << Q << std::endl;
   assert(pdfIsInitialized_);
   double fa = LHAPDF::xfx(1, xa, Q, 0)/xa;
   double fb = LHAPDF::xfx(1, xb, Q, 0)/xb;
@@ -181,10 +192,10 @@ HttXsectionIntegrandStableTaus::compProb(double tau1Px, double tau1Py, double ta
     LorentzVector ditauP4_rf = tau1P4_rf + tau2P4_rf;
     std::cout << " ditau: Pt = " << ditauP4_rf.pt() << ", eta = " << ditauP4_rf.eta() << ", phi = " << ditauP4_rf.phi() << ", mass = " << ditauP4_rf.mass() << std::endl;
   }
-  madgraphGluon1P4_[0] =  0.5*mH_; 
-  madgraphGluon1P4_[3] = +0.5*mH_;
-  madgraphGluon2P4_[0] =  0.5*mH_;
-  madgraphGluon2P4_[3] = -0.5*mH_;
+  madgraphGluon1P4_[0] =  0.5*Q; 
+  madgraphGluon1P4_[3] = +0.5*Q;
+  madgraphGluon2P4_[0] =  0.5*Q;
+  madgraphGluon2P4_[3] = -0.5*Q;
   madgraphTau1P4_[0] = tau1P4_rf.energy();
   madgraphTau1P4_[1] = tau1P4_rf.px();
   madgraphTau1P4_[2] = tau1P4_rf.py();
@@ -193,9 +204,14 @@ HttXsectionIntegrandStableTaus::compProb(double tau1Px, double tau1Py, double ta
   madgraphTau2P4_[1] = tau2P4_rf.px();
   madgraphTau2P4_[2] = tau2P4_rf.py();
   madgraphTau2P4_[3] = tau2P4_rf.pz();
-  madgraph_.setMomenta(madgraphMomenta_);
-  madgraph_.sigmaKin();
-  double prob_ME = madgraph_.getMatrixElements()[0];
+  me_madgraph_.setMomenta(madgraphMomenta_);
+  me_madgraph_.sigmaKin();
+  //double prob_ME = me_madgraph_.getMatrixElements()[0];
+  me_lit_.setHiggsWidth(GammaH_);
+  me_lit_.setMomenta(madgraphMomenta_);
+  double prob_ME = me_lit_.getMatrixElement();
+  //std::cout << "prob_ME: madgraph = " << me_madgraph_.getMatrixElements()[0] << ", lit = " << me_lit_.getMatrixElement() << std::endl;
+  assert(prob_ME >= 0.);
 
   const double hbar_c = 0.1973; // GeV fm
   const double conversionFactor = 1.e+10*square(hbar_c); // conversion factor from GeV^-2 to picobarn = 10^-40m
@@ -204,7 +220,7 @@ HttXsectionIntegrandStableTaus::compProb(double tau1Px, double tau1Py, double ta
 
   double prob = prob_flux*prob_PDF*prob_ME*prob_PS*jacobiFactor;
   assert(prob >= 0.);
-  if ( verbosity_ >= 2 ) {
+  if ( verbosity_ >= 1 ) {
     std::cout << "prob: flux = " << prob_flux << ", PDF = " << prob_PDF << ", ME = " << prob_ME << ", PS = " << prob_PS << ", Jacobi = " << jacobiFactor
 	      << " --> returning " << prob << std::endl;
   }

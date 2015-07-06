@@ -1,12 +1,12 @@
 
 /**
-   \class testHttXsectionStableTaus testHttXsectionStableTaus.cc "TauAnalysis/SVfitStandalone/bin/testHttXsectionStableTaus.cc"
+   \class testHttXsectionStableHiggs testHttXsectionStableHiggs.cc "TauAnalysis/SVfitStandalone/bin/testHttXsectionStableHiggs.cc"
    \brief Compute leading order gg -> Higgs -> tautau cross-section, assuming taus are stable particles
 */
 
 #include "FWCore/ParameterSet/interface/FileInPath.h"
 
-#include "TauAnalysis/SVfitMEM/interface/HttXsectionStableTaus.h"
+#include "TauAnalysis/SVfitMEM/interface/HttXsectionStableHiggs.h"
 
 using namespace svFitMEM;
 
@@ -19,6 +19,7 @@ namespace
       std::cerr << "Error: Cannot find file = " << fileName << " !!" << std::endl;
       assert(0);
     }
+    //std::cout << "<findFile>: returning '" << inputFile.fullPath() << "'" << std::endl; 
     return inputFile.fullPath().data();
   }
 }
@@ -27,6 +28,9 @@ int main(int argc, char* argv[])
 {
   // CV: set center-of-mass energy to 13 TeV (LHC run 2)
   double sqrtS = 14.e+3; 
+
+  bool applyNWA = true;
+  //bool applyNWA = false;
 
   // define Higgs mass points 
   std::vector<double> mH;
@@ -59,7 +63,7 @@ int main(int argc, char* argv[])
   //    
   // NOTE: The cross-sections computed using MadGraph are expected to be lower by about a factor 2,
   //       as they are leading order only.
-  //       The k-factors are taken from http://atlas.web.cern.ch/Atlas/GROUPS/PHYSICS/HIGGS/higgs-xsec/cross.pdf .
+  //       The k-factors are taken from http://atlas.web.cern.ch/Atlas/GROUPS/PHYSICS/HIGGS/higgs-xsec/cross.pdf for 13 TeV collisions.
   //
   std::map<double, double> branchingRatios;
   branchingRatios[90.]  = 8.33e-02;
@@ -80,50 +84,50 @@ int main(int argc, char* argv[])
   branchingRatios[300.] = 7.34e-05;
   branchingRatios[350.] = 4.76e-05;
   branchingRatios[400.] = 2.84e-05;
-  branchingRatios[450.] = 1.99e-05;
+  branchingRatios[450.] = 1.99e-04;
   branchingRatios[500.] = 1.53e-05;
 
   std::map<double, double> xSection_targets_13TeV;
   // format: parton luminosity ratio * NLO cross-section [pb] / k factor
-  xSection_targets_13TeV[90.]  = 2.137*36.23*branchingRatios[90.]/1.89;	
-  xSection_targets_13TeV[100.] = 2.185*29.68*branchingRatios[100.]/1.89;
-  xSection_targets_13TeV[105.] = 2.208*27.01*branchingRatios[105.]/1.89;
-  xSection_targets_13TeV[110.] = 2.230*24.70*branchingRatios[110.]/1.90;
-  xSection_targets_13TeV[115.] = 2.253*22.66*branchingRatios[115.]/1.90;
-  xSection_targets_13TeV[120.] = 2.274*20.86*branchingRatios[120.]/1.90;
-  xSection_targets_13TeV[125.] = 2.296*19.27*branchingRatios[125.]/1.90;
-  xSection_targets_13TeV[130.] = 2.317*17.85*branchingRatios[130.]/1.90;
-  xSection_targets_13TeV[135.] = 2.338*16.57*branchingRatios[135.]/1.91;
-  xSection_targets_13TeV[140.] = 2.358*15.42*branchingRatios[140.]/1.91;
-  xSection_targets_13TeV[145.] = 2.379*14.46*branchingRatios[145.]/1.91;
-  xSection_targets_13TeV[150.] = 2.399*13.55*branchingRatios[150.]/1.91;
-  xSection_targets_13TeV[160.] = 2.439*11.96*branchingRatios[160.]/1.92;
-  xSection_targets_13TeV[200.] = 2.592*7.081*branchingRatios[200.]/1.94;
-  xSection_targets_13TeV[250.] = 2.776*4.783*branchingRatios[250.]/1.96;
-  xSection_targets_13TeV[300.] = 2.956*3.594*branchingRatios[300.]/1.99;
+  xSection_targets_13TeV[90.]  = 2.137*36.23/1.89;	
+  xSection_targets_13TeV[100.] = 2.185*29.68/1.89;
+  xSection_targets_13TeV[105.] = 2.208*27.01/1.89;
+  xSection_targets_13TeV[110.] = 2.230*24.70/1.90;
+  xSection_targets_13TeV[115.] = 2.253*22.66/1.90;
+  xSection_targets_13TeV[120.] = 2.274*20.86/1.90;
+  xSection_targets_13TeV[125.] = 2.296*19.27/1.90;
+  xSection_targets_13TeV[130.] = 2.317*17.85/1.90;
+  xSection_targets_13TeV[135.] = 2.338*16.57/1.91;
+  xSection_targets_13TeV[140.] = 2.358*15.42/1.91;
+  xSection_targets_13TeV[145.] = 2.379*14.46/1.91;
+  xSection_targets_13TeV[150.] = 2.399*13.55/1.91;
+  xSection_targets_13TeV[160.] = 2.439*11.96/1.92;
+  xSection_targets_13TeV[200.] = 2.592*7.081/1.94;
+  xSection_targets_13TeV[250.] = 2.776*4.783/1.96;
+  xSection_targets_13TeV[300.] = 2.956*3.594/1.99;
 
   std::map<double, double> xSection_targets_14TeV;
   // format: parton luminosity ratio * NLO cross-section [pb] / k factor
-  xSection_targets_14TeV[90.]  = 2.385*36.23*branchingRatios[90.]/1.89;	
-  xSection_targets_14TeV[100.] = 2.446*29.68*branchingRatios[100.]/(2.446*29.68/25.759);
-  xSection_targets_14TeV[105.] = 2.475*27.01*branchingRatios[105.]/1.89;
-  xSection_targets_14TeV[110.] = 2.504*24.70*branchingRatios[110.]/1.90;
-  xSection_targets_14TeV[115.] = 2.532*22.66*branchingRatios[115.]/1.90;
-  xSection_targets_14TeV[120.] = 2.560*20.86*branchingRatios[120.]/1.90;
-  xSection_targets_14TeV[125.] = 2.587*19.27*branchingRatios[125.]/(2.587*19.27/17.317);
-  xSection_targets_14TeV[130.] = 2.614*17.85*branchingRatios[130.]/1.90;
-  xSection_targets_14TeV[135.] = 2.641*16.57*branchingRatios[135.]/1.91;
-  xSection_targets_14TeV[140.] = 2.668*15.42*branchingRatios[140.]/1.91;
-  xSection_targets_14TeV[145.] = 2.694*14.46*branchingRatios[145.]/1.91;
-  xSection_targets_14TeV[150.] = 2.720*13.55*branchingRatios[150.]/(2.720*13.55/12.448);
-  xSection_targets_14TeV[160.] = 2.771*11.96*branchingRatios[160.]/1.92;
-  xSection_targets_14TeV[200.] = 2.969*7.081*branchingRatios[200.]/(2.969*7.081/7.366);
-  xSection_targets_14TeV[250.] = 3.208*4.783*branchingRatios[250.]/(3.208*4.783/4.993);
-  xSection_targets_14TeV[300.] = 3.444*3.594*branchingRatios[300.]/(3.444*3.594/3.829);
-  xSection_targets_14TeV[350.] = 3.208*4.783*branchingRatios[350.]/(3.208*4.783/3.532);
-  xSection_targets_14TeV[400.] = 3.444*3.594*branchingRatios[400.]/(3.444*3.594/3.786);
-  xSection_targets_14TeV[450.] = 3.208*4.783*branchingRatios[450.]/(3.208*4.783/2.846);
-  xSection_targets_14TeV[500.] = 3.444*3.594*branchingRatios[500.]/(3.444*3.594/1.960);
+  xSection_targets_14TeV[90.]  = 2.385*36.23/1.89;	
+  xSection_targets_14TeV[100.] = 2.446*29.68/(2.446*29.68/25.759);
+  xSection_targets_14TeV[105.] = 2.475*27.01/1.89;
+  xSection_targets_14TeV[110.] = 2.504*24.70/1.90;
+  xSection_targets_14TeV[115.] = 2.532*22.66/1.90;
+  xSection_targets_14TeV[120.] = 2.560*20.86/1.90;
+  xSection_targets_14TeV[125.] = 2.587*19.27/(2.587*19.27/17.317);
+  xSection_targets_14TeV[130.] = 2.614*17.85/1.90;
+  xSection_targets_14TeV[135.] = 2.641*16.57/1.91;
+  xSection_targets_14TeV[140.] = 2.668*15.42/1.91;
+  xSection_targets_14TeV[145.] = 2.694*14.46/1.91;
+  xSection_targets_14TeV[150.] = 2.720*13.55/(2.720*13.55/12.448);
+  xSection_targets_14TeV[160.] = 2.771*11.96/1.92;
+  xSection_targets_14TeV[200.] = 2.969*7.081/(2.969*7.081/7.366);
+  xSection_targets_14TeV[250.] = 3.208*4.783/(3.208*4.783/4.993);
+  xSection_targets_14TeV[300.] = 3.444*3.594/(3.444*3.594/3.829);
+  xSection_targets_14TeV[350.] = 3.208*4.783/(3.208*4.783/3.532);
+  xSection_targets_14TeV[400.] = 3.444*3.594/(3.444*3.594/3.786);
+  xSection_targets_14TeV[450.] = 3.208*4.783/(3.208*4.783/2.846);
+  xSection_targets_14TeV[500.] = 3.444*3.594/(3.444*3.594/1.960);
 
   std::map<double, std::string> madgraphFileNames;
   madgraphFileNames[90.]  = "TauAnalysis/SVfitMEM/data/param_card_mH90.dat";
@@ -147,15 +151,20 @@ int main(int argc, char* argv[])
 
   for ( std::vector<double>::const_iterator mH_i = mH.begin();
 	mH_i != mH.end(); ++mH_i ) {
-    HttXsectionStableTaus HttXsection(findFile(madgraphFileNames[*mH_i]), sqrtS, *mH_i, pdfFileName.data(), verbosity);
-    HttXsection.setBR(branchingRatios[*mH_i]);
+    HttXsectionStableHiggs HttXsection(findFile(madgraphFileNames[*mH_i]), sqrtS, *mH_i, pdfFileName.data(), applyNWA, verbosity);
     //HttXsection.setMaxObjFunctionCalls(500000); 
     HttXsection.setMaxObjFunctionCalls(10000); 
     HttXsection.integrate();
     double xSection = HttXsection.xSection();
     double xSectionErr = HttXsection.xSectionErr();
+    //---------------------------------------------------------------------------
+    // CV: divide cross-section and uncertainty by BR(Higgs -> tautau),
+    //     in case matrix element for gg -> H, H -> tautau computed by Madgraph is used
+    //xSection /= branchingRatios[*mH_i];
+    //xSectionErr /= branchingRatios[*mH_i];
+    //---------------------------------------------------------------------------
     std::cout << "mH = " << (*mH_i) << " (GammaH = " << HttXsection.GammaH() << "):" 
-	      << " cross-section*BR = " << xSection << " +/- " << xSectionErr << " pb" 
+	      << " cross-section = " << xSection << " +/- " << xSectionErr << " pb" 
 	      << " (expected = " << xSection_targets_14TeV[*mH_i] << " pb, ratio = " << xSection/xSection_targets_14TeV[*mH_i] << ")" << std::endl;
   }
 

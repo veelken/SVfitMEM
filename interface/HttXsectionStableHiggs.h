@@ -1,7 +1,7 @@
-#ifndef TauAnalysis_SVfitMEM_HttXsectionStableTaus_h
-#define TauAnalysis_SVfitMEM_HttXsectionStableTaus_h
+#ifndef TauAnalysis_SVfitMEM_HttXsectionStableHiggs_h
+#define TauAnalysis_SVfitMEM_HttXsectionStableHiggs_h
 
-#include "TauAnalysis/SVfitMEM/interface/HttXsectionIntegrandStableTaus.h"
+#include "TauAnalysis/SVfitMEM/interface/HttXsectionIntegrandStableHiggs.h"
 
 #include <gsl/gsl_monte.h>
 #include <gsl/gsl_monte_vegas.h>
@@ -9,14 +9,11 @@
 #include <TBenchmark.h>
 #include <TMath.h>
 
-class HttXsectionStableTaus
+class HttXsectionStableHiggs
 {
  public:
-  HttXsectionStableTaus(const std::string&, double, double, const std::string&, int = 0);
-  ~HttXsectionStableTaus();
-
-  /// set Higgs -> tautau decay branching fraction
-    void setBR(double);
+  HttXsectionStableHiggs(const std::string&, double, double, const std::string&, bool, int = 0);
+  ~HttXsectionStableHiggs();
 
   /// number of function calls for VEGAS integration (default is 10000)
   void setMaxObjFunctionCalls(unsigned value) 
@@ -37,9 +34,11 @@ class HttXsectionStableTaus
 
  protected:
 
-  svFitMEM::HttXsectionIntegrandStableTaus* integrand_;
+  svFitMEM::HttXsectionIntegrandStableHiggs* integrand_;
   double sqrtS_;
   double mH_;
+
+  bool applyNWA_;
 
   /// auxiliary variables for VEGAS integration
   gsl_monte_function* vegasIntegrand_;

@@ -18,6 +18,9 @@ class HttXsectionWithTauDecays
   HttXsectionWithTauDecays(const std::string&, double, double, const std::string&, int = 0);
   ~HttXsectionWithTauDecays();
 
+  /// set Higgs -> tautau decay branching fraction
+  void setBR(double br) { integrand_->setBR(br); }
+
   /// take resolution on energy of hadronic tau decays into account
   void shiftVisPt(bool value, TFile* inputFile);
 

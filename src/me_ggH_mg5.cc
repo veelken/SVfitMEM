@@ -7,8 +7,18 @@
 
 #include "TauAnalysis/SVfitMEM/interface/me_ggH_mg5.h"
 #include "TauAnalysis/SVfitMEM/interface/HelAmps_heft.h"
+#include "TauAnalysis/SVfitMEM/interface/svFitAuxFunctions.h"
+
+#include <TMath.h>
 
 using namespace MG5_heft; 
+using namespace svFitMEM;
+
+const double mtop = 172.5;
+
+namespace LHAPDF {
+  double alphasPDF(int nset, double Q);
+}
 
 //==========================================================================
 // Class member functions for calculating the matrix elements for
@@ -18,7 +28,7 @@ using namespace MG5_heft;
 //--------------------------------------------------------------------------
 // Initialize process.
 
-void me_ggH_mg5::initProc(string param_card_name) 
+void me_ggH_mg5::initProc(const string& param_card_name) 
 {
   // Instantiate the model class and set parameters that stay fixed during run
   pars = Parameters_heft::getInstance(); 
@@ -137,8 +147,12 @@ void me_ggH_mg5::sigmaKin()
   for (int i = 0; i < nprocesses; i++ )
     matrix_element[i] /= denominators[i]; 
 
-
-
+  if ( applyNWA_ ) {
+    const double one_over_Pi = 1./TMath::Pi();
+    double GammaH_times_mH = this->getHiggsWidth()*this->getHiggsMass();
+    for (int i = 0; i < nprocesses; i++ )
+      matrix_element[i] *= (one_over_Pi*GammaH_times_mH);
+  }
 }
 
 //--------------------------------------------------------------------------

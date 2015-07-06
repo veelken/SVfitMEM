@@ -65,6 +65,16 @@ namespace svFitMEM
     return x*x*x*x*x*x;
   }
 
+  inline double seventh(double x)
+  {
+    return x*x*x*x*x*x*x;
+  }
+
+  inline double eigth(double x)
+  {
+    return x*x*x*x*x*x*x*x;
+  }
+
   /**
      \typedef SVfitStandalone::Vector
      \brief   spacial momentum vector (equivalent to reco::Candidate::Vector)
