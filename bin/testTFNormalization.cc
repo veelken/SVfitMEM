@@ -64,15 +64,6 @@ double gTF_met(double* x, size_t dim, void* params_void)
   return prob;
 }
 
-double GammaTauToHad() 
-{
-  const double hbar_c = 0.1973e-15; // hbar*c = 197.3 MeV fm, converted to [GeV m]
-  const double ctau = 87.e-6; // tau lifetime = 87 microns, converted to [m]
-  const double GammaTau = hbar_c/ctau;
-  const double GammaHad = GammaTau*0.648; // BR(tau -> hadrons) = 64.8%
-  return GammaHad;
-}
-
 double gTF_hadTau(double* x, size_t dim, void* params_void)
 {
   double* params = (double*)params_void;
@@ -80,33 +71,31 @@ double gTF_hadTau(double* x, size_t dim, void* params_void)
   double tauP2 = square(tauP);
   double tauEn2 = tauP2 + tauLeptonMass2;
   double tauEn = TMath::Sqrt(tauEn2);
-  //std::cout << "tauEn = " << tauEn << std::endl;
   double tauEta = params[1];
   double tauPhi = params[2];
   double visMass = params[3];
   double visMass2 = square(visMass);
   double X = x[0];
   double nuEn = (1. - X)*tauEn;
-  //std::cout << "X = " << X << ": nuEn = " << nuEn << std::endl;
   double nuP = nuEn; // nuMass = 0
   double nuP2 = square(nuP);
   double phiNu = x[1];
   double cosThetaNu = ((1. - X)*tauEn2 - 0.5*(tauLeptonMass2 - visMass2))/(tauP*nuP);
   if ( !(cosThetaNu >= -1. && cosThetaNu <= +1.) ) return 0.;
   double visEn = TMath::Sqrt(tauP2 + nuP2 - 2.*tauP*nuP*cosThetaNu + visMass2);
-  //std::cout << "cosThetaNu = " << cosThetaNu << ", visEn = " << visEn << std::endl;
-  const double GammaHad = GammaTauToHad();
-  const double M2 = 16.*TMath::Pi()*cube(tauLeptonMass)*GammaHad/(tauLeptonMass2 - visMass2);
-  double prob = (M2/(32.*square(TMath::Pi())*tauEn))*(1./visEn)*(X*tauEn2/tauP);
+  double prob = (1./(32.*square(TMath::Pi())*tauEn))*(1./visEn)*(X*tauEn2/tauP);
+  //-------------------------------------------------------------------------
+  // CV: multiply by constant matrix element, 
+  //     chosen such that the branching fraction of the tau to decay into hadrons is reproduced      
+  const double M2 = 16.*TMath::Pi()*cube(tauLeptonMass)*GammaTauToHad/(tauLeptonMass2 - visMass2);
+  prob *= M2;
+  //-------------------------------------------------------------------------
   return prob;
 }
 
-double GammaTauToLep(int lepType) 
+double GammaLep(int lepType) 
 {
-  const double hbar_c = 0.1973e-15; // hbar*c = 197.3 MeV fm, converted to [GeV m]
-  const double ctau = 87.e-6; // tau lifetime = 87 microns, converted to [m]
-  const double GammaTau = hbar_c/ctau;
-  double GammaLep = ( lepType == kMuon ) ? GammaTau*0.174 : GammaTau*0.178; // BR(tau -> muon) = 17.4%, BR(tau -> electron) = 17.8%, 
+  double GammaLep = ( lepType == kMuon ) ? GammaTauToMu : GammaTauToElec;
   return GammaLep;
 }
 
@@ -136,7 +125,6 @@ double gTF_lepTau(double* x, size_t dim, void* params_void)
   if ( !(cosThetaNuNu >= -1. && cosThetaNuNu <= +1.) ) return 0.;
   double visEn = TMath::Sqrt(tauP2 + nunuP2 - 2.*tauP*nunuP*cosThetaNuNu + visMass2);
   //std::cout << "cosThetaNuNu = " << cosThetaNuNu << ", visEn = " << visEn << std::endl;
-  const double GF = 1.166e-5; // in units of GeV^-2, taken from http://pdg.lbl.gov/2014/reviews/rpp2014-rev-phys-constants.pdf
   const double GFfactor = square(GF)/(2.*square(TMath::Pi()));
   double tauEn_rf = (tauLeptonMass2 + nunuMass2 - visMass2)/(2.*nunuMass);
   double visEn_rf = tauEn_rf - nunuMass;
@@ -255,13 +243,13 @@ int main(int argc, char* argv[])
 	double normalization = compIntegral(&gTF_lepTau, 3, xl, xu, params, normalizationErr);
 	double tauEn = TMath::Sqrt(square(tauP) + tauLeptonMass2);
 	double gamma = tauEn/tauLeptonMass;
-	double GammaLep = GammaTauToLep(lepType)/gamma;
+	double GammaTauToLep_div_gamma = GammaLep(lepType)/gamma;
 	delete [] xl;
 	delete [] xu;
 	delete [] params;
-	fillWithOverFlow(norm_lepTau, normalization/GammaLep);
+	fillWithOverFlow(norm_lepTau, normalization/GammaTauToLep_div_gamma);
 	std::cout << " toy #" << idxToy << ": normalization = " << normalization << " +/- " << normalizationErr 
-		  << " (expected = " << GammaLep << ", ratio = " << (normalization/GammaLep) << " +/- " << (normalizationErr/GammaLep) << ")" << std::endl;
+		  << " (expected = " << GammaTauToLep_div_gamma << ", ratio = " << (normalization/GammaTauToLep_div_gamma) << " +/- " << (normalizationErr/GammaTauToLep_div_gamma) << ")" << std::endl;
       }
     } else if ( (*checkToRun) == kTF_hadTau ) {
       std::cout << "checking transfer function for hadronic tau decays..." << std::endl;
@@ -293,13 +281,13 @@ int main(int argc, char* argv[])
 	double normalization = compIntegral(&gTF_hadTau, 2, xl, xu, params, normalizationErr);
 	double tauEn = TMath::Sqrt(square(tauP) + tauLeptonMass2);
 	double gamma = tauEn/tauLeptonMass;
-	double GammaHad = GammaTauToHad()/gamma;
+	double GammaTauToHad_div_gamma = GammaTauToHad/gamma;
 	delete [] xl;
 	delete [] xu;
 	delete [] params;
-	fillWithOverFlow(norm_hadTau, normalization/GammaHad);
+	fillWithOverFlow(norm_hadTau, normalization/GammaTauToHad_div_gamma);
 	std::cout << " toy #" << idxToy << ": normalization = " << normalization << " +/- " << normalizationErr 
-		  << " (expected = " << GammaHad << ", ratio = " << (normalization/GammaHad) << " +/- " << (normalizationErr/GammaHad) << ")" << std::endl;
+		  << " (expected = " << GammaTauToHad_div_gamma << ", ratio = " << (normalization/GammaTauToHad_div_gamma) << " +/- " << (normalizationErr/GammaTauToHad_div_gamma) << ")" << std::endl;
       }
     } else {
       std::cerr << "Check of type = " << (*checkToRun) << " is not defined !!" << std::endl;

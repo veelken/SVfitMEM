@@ -7,6 +7,7 @@
 #include "FWCore/ParameterSet/interface/FileInPath.h"
 
 #include "TauAnalysis/SVfitMEM/interface/HttXsectionStableTaus.h"
+#include "TauAnalysis/SVfitMEM/interface/HttXsectionIntegrandStableTaus.h"
 
 using namespace svFitMEM;
 
@@ -28,19 +29,14 @@ int main(int argc, char* argv[])
   // CV: set center-of-mass energy to 13 TeV (LHC run 2)
   double sqrtS = 14.e+3; 
 
+  //int mode = HttXsectionIntegrandStableTaus::kMadgraph;
+  int mode = HttXsectionIntegrandStableTaus::kLiterature;
+
   // define Higgs mass points 
   std::vector<double> mH;
   //mH.push_back(90.);
   mH.push_back(100.);
-  //mH.push_back(105.);
-  //mH.push_back(110.);
-  //mH.push_back(115.);
-  //mH.push_back(120.);
   mH.push_back(125.);
-  //mH.push_back(130.);
-  //mH.push_back(135.);
-  //mH.push_back(140.);
-  //mH.push_back(145.);
   mH.push_back(150.);
   //mH.push_back(160.);
   mH.push_back(200.);
@@ -59,20 +55,13 @@ int main(int argc, char* argv[])
   //    
   // NOTE: The cross-sections computed using MadGraph are expected to be lower by about a factor 2,
   //       as they are leading order only.
-  //       The k-factors are taken from http://atlas.web.cern.ch/Atlas/GROUPS/PHYSICS/HIGGS/higgs-xsec/cross.pdf .
+  //       The k-factors are computed by taking the ratio of the cross-sections computed by the LHC XS working-group
+  //       and the leading order cross-sections given by Eq. 38 (with Eqs. 30, 31 and 36) of http://www.itp.phys.ethz.ch/education/fs10/aft/Thesis_MB.pdf 
   //
   std::map<double, double> branchingRatios;
   branchingRatios[90.]  = 8.33e-02;
   branchingRatios[100.] = 8.28e-02;
-  branchingRatios[105.] = 8.17e-02;
-  branchingRatios[110.] = 7.95e-02;
-  branchingRatios[115.] = 7.58e-02;
-  branchingRatios[120.] = 7.04e-02;
   branchingRatios[125.] = 6.32e-02;
-  branchingRatios[130.] = 5.45e-02;
-  branchingRatios[135.] = 4.49e-02;
-  branchingRatios[140.] = 3.52e-02;
-  branchingRatios[145.] = 2.61e-02;
   branchingRatios[150.] = 1.78e-02;
   branchingRatios[160.] = 3.96e-03;
   branchingRatios[200.] = 2.87e-04;
@@ -87,15 +76,6 @@ int main(int argc, char* argv[])
   // format: parton luminosity ratio * NLO cross-section [pb] / k factor
   xSection_targets_13TeV[90.]  = 2.137*36.23*branchingRatios[90.]/1.89;	
   xSection_targets_13TeV[100.] = 2.185*29.68*branchingRatios[100.]/1.89;
-  xSection_targets_13TeV[105.] = 2.208*27.01*branchingRatios[105.]/1.89;
-  xSection_targets_13TeV[110.] = 2.230*24.70*branchingRatios[110.]/1.90;
-  xSection_targets_13TeV[115.] = 2.253*22.66*branchingRatios[115.]/1.90;
-  xSection_targets_13TeV[120.] = 2.274*20.86*branchingRatios[120.]/1.90;
-  xSection_targets_13TeV[125.] = 2.296*19.27*branchingRatios[125.]/1.90;
-  xSection_targets_13TeV[130.] = 2.317*17.85*branchingRatios[130.]/1.90;
-  xSection_targets_13TeV[135.] = 2.338*16.57*branchingRatios[135.]/1.91;
-  xSection_targets_13TeV[140.] = 2.358*15.42*branchingRatios[140.]/1.91;
-  xSection_targets_13TeV[145.] = 2.379*14.46*branchingRatios[145.]/1.91;
   xSection_targets_13TeV[150.] = 2.399*13.55*branchingRatios[150.]/1.91;
   xSection_targets_13TeV[160.] = 2.439*11.96*branchingRatios[160.]/1.92;
   xSection_targets_13TeV[200.] = 2.592*7.081*branchingRatios[200.]/1.94;
@@ -106,15 +86,7 @@ int main(int argc, char* argv[])
   // format: parton luminosity ratio * NLO cross-section [pb] / k factor
   xSection_targets_14TeV[90.]  = 2.385*36.23*branchingRatios[90.]/1.89;	
   xSection_targets_14TeV[100.] = 2.446*29.68*branchingRatios[100.]/(2.446*29.68/25.759);
-  xSection_targets_14TeV[105.] = 2.475*27.01*branchingRatios[105.]/1.89;
-  xSection_targets_14TeV[110.] = 2.504*24.70*branchingRatios[110.]/1.90;
-  xSection_targets_14TeV[115.] = 2.532*22.66*branchingRatios[115.]/1.90;
-  xSection_targets_14TeV[120.] = 2.560*20.86*branchingRatios[120.]/1.90;
   xSection_targets_14TeV[125.] = 2.587*19.27*branchingRatios[125.]/(2.587*19.27/17.317);
-  xSection_targets_14TeV[130.] = 2.614*17.85*branchingRatios[130.]/1.90;
-  xSection_targets_14TeV[135.] = 2.641*16.57*branchingRatios[135.]/1.91;
-  xSection_targets_14TeV[140.] = 2.668*15.42*branchingRatios[140.]/1.91;
-  xSection_targets_14TeV[145.] = 2.694*14.46*branchingRatios[145.]/1.91;
   xSection_targets_14TeV[150.] = 2.720*13.55*branchingRatios[150.]/(2.720*13.55/12.448);
   xSection_targets_14TeV[160.] = 2.771*11.96*branchingRatios[160.]/1.92;
   xSection_targets_14TeV[200.] = 2.969*7.081*branchingRatios[200.]/(2.969*7.081/7.366);
@@ -147,16 +119,24 @@ int main(int argc, char* argv[])
 
   for ( std::vector<double>::const_iterator mH_i = mH.begin();
 	mH_i != mH.end(); ++mH_i ) {
-    HttXsectionStableTaus HttXsection(findFile(madgraphFileNames[*mH_i]), sqrtS, *mH_i, pdfFileName.data(), verbosity);
-    HttXsection.setBR(branchingRatios[*mH_i]);
-    //HttXsection.setMaxObjFunctionCalls(500000); 
-    HttXsection.setMaxObjFunctionCalls(10000); 
-    HttXsection.integrate();
-    double xSection = HttXsection.xSection();
-    double xSectionErr = HttXsection.xSectionErr();
-    std::cout << "mH = " << (*mH_i) << " (GammaH = " << HttXsection.GammaH() << "):" 
+    HttXsectionStableTaus* HttXsection = 0;
+    if ( mode == HttXsectionIntegrandStableTaus::kMadgraph ) {
+      HttXsection = new HttXsectionStableTaus(sqrtS, *mH_i, pdfFileName.data(), HttXsectionIntegrandStableTaus::kMadgraph, findFile(madgraphFileNames[*mH_i]), verbosity);
+    } else if ( mode == HttXsectionIntegrandStableTaus::kLiterature ) {
+      HttXsection = new HttXsectionStableTaus(sqrtS, *mH_i, pdfFileName.data(), HttXsectionIntegrandStableTaus::kLiterature, findFile(madgraphFileNames[*mH_i]), verbosity);
+    } else {
+      assert(0);
+    }
+    HttXsection->setBR(branchingRatios[*mH_i]);
+    //HttXsection->setMaxObjFunctionCalls(500000); 
+    HttXsection->setMaxObjFunctionCalls(10000); 
+    HttXsection->integrate();
+    double xSection = HttXsection->xSection();
+    double xSectionErr = HttXsection->xSectionErr();
+    std::cout << "mH = " << (*mH_i) << " (GammaH = " << HttXsection->GammaH() << "):" 
 	      << " cross-section*BR = " << xSection << " +/- " << xSectionErr << " pb" 
 	      << " (expected = " << xSection_targets_14TeV[*mH_i] << " pb, ratio = " << xSection/xSection_targets_14TeV[*mH_i] << ")" << std::endl;
+    delete HttXsection;
   }
 
   return 0;

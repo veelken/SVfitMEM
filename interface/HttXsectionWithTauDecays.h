@@ -15,7 +15,7 @@
 class HttXsectionWithTauDecays
 {
  public:
-  HttXsectionWithTauDecays(const std::string&, double, double, const std::string&, int = 0);
+  HttXsectionWithTauDecays(double, double, const std::string&, int = HttXsectionIntegrandWithTauDecays::kLiterature, const std::string& = "", int = 0); 
   ~HttXsectionWithTauDecays();
 
   /// set Higgs -> tautau decay branching fraction
@@ -51,9 +51,12 @@ class HttXsectionWithTauDecays
 
  protected:
 
-  svFitMEM::HttXsectionIntegrandWithTauDecays* integrand_;
+  bool applyMEtTF_;
+
+  HttXsectionIntegrandWithTauDecays* integrand_;
   double sqrtS_;
   double mH_;
+  double mH2_;
 
   /// auxiliary variables for VEGAS integration
   gsl_monte_function* vegasIntegrand_;
@@ -70,6 +73,19 @@ class HttXsectionWithTauDecays
   double* xl_;
   double* xu_;
   
+  double xl_vis1P_;
+  double xu_vis1P_;
+  double xl_vis1Px_;
+  double xu_vis1Px_;
+  double xl_vis1Py_;
+  double xu_vis1Py_;
+  double xl_mVis2_;
+  double xu_mVis2_;
+  double xl_vis2Px_;
+  double xu_vis2Px_;
+  double xl_vis2Py_;
+  double xu_vis2Py_;
+
   /// cross-section
   double xSection_;
   /// uncertainty on cross-section

@@ -26,9 +26,7 @@ class me_ggH_mg5
   public:
 
     // Constructor.
-    me_ggH_mg5(bool applyNWA = false)
-      : applyNWA_(applyNWA)
-    {}
+    me_ggH_mg5(bool = false, bool = true);
 
     // Initialize process.
     virtual void initProc(const string& param_card_name); 
@@ -41,39 +39,6 @@ class me_ggH_mg5
 
     // Info on the subprocess.
     virtual string name() const { return "g g > ta- ta+ (heft)"; }
-
-    //void setHiggsMass(double mH) 
-    //{ 
-    //  pars->mdl_MH = mH; 
-    //
-    //  pars->mdl_MP = 1. * pars->mdl_MH; 
-    //  pars->mdl_MH__exp__2 = pow(pars->mdl_MH, 2.); 
-    //  pars->mdl_MH__exp__4 = pow(pars->mdl_MH, 4.); 
-    //  pars->mdl_MH__exp__6 = pow(pars->mdl_MH, 6.); 
-    //  pars->mdl_MH__exp__8 = pow(pars->mdl_MH, 8.); 
-    //  pars->mdl_MH__exp__10 = pow(pars->mdl_MH, 10.); 
-    //  pars->mdl_MH__exp__12 = pow(pars->mdl_MH, 12.); 
-    //  pars->mdl_AH = (47. * pars->mdl_ee__exp__2 * (1. - (2. * pars->mdl_MH__exp__4)/(987. *
-    //    pars->mdl_MT__exp__4) - (14. * pars->mdl_MH__exp__2)/(705. * pars->mdl_MT__exp__2) + (213.
-    //    * pars->mdl_MH__exp__12)/(2.634632e7 * pars->mdl_MW__exp__12) + (5. *
-    //    pars->mdl_MH__exp__10)/(119756. * pars->mdl_MW__exp__10) + (41. *
-    //    pars->mdl_MH__exp__8)/(180950. * pars->mdl_MW__exp__8) + (87. *
-    //    pars->mdl_MH__exp__6)/(65800. * pars->mdl_MW__exp__6) + (57. * pars->mdl_MH__exp__4)/(6580.
-    //    * pars->mdl_MW__exp__4) + (33. * pars->mdl_MH__exp__2)/(470. * pars->mdl_MW__exp__2)))/(72.
-    //    * pow(M_PI, 2.) * pars->mdl_v);
-    //  pars->mdl_lam = pars->mdl_MH__exp__2/(2. * pars->mdl_v__exp__2); 
-    //
-    //  pars->setDependentParameters();
-    //  pars->setDependentCouplings();
-    //}
-    //void setHiggsWidth(double width) 
-    //{
-    //  pars->mdl_WH1 = width;
-    //  pars->mdl_WH = width;
-    //
-    //  pars->setDependentParameters();
-    //  pars->setDependentCouplings();
-    //}
 
     double getHiggsMass() const
     {
@@ -103,8 +68,12 @@ class me_ggH_mg5
 
   private:
 
+    // flag to enable/disable narrow-width approximation
     bool applyNWA_;
-
+    
+    // flag to include/not include Higgs -> tautau decay in matrix element
+    bool includeHtoTauTauDecay_;
+    
     // Private functions to calculate the matrix element for all subprocesses
     // Calculate wavefunctions
     void calculate_wavefunctions(const int perm[], const int hel[]); 

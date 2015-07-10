@@ -14,16 +14,19 @@ namespace LHAPDF {
 const HttXsectionIntegrandStableHiggs* HttXsectionIntegrandStableHiggs::gHttXsectionIntegrandStableHiggs = 0;
 bool HttXsectionIntegrandStableHiggs::pdfIsInitialized_ = false;
 
-HttXsectionIntegrandStableHiggs::HttXsectionIntegrandStableHiggs(const std::string& madgraphFileName, double sqrtS, double mH, const std::string& pdfFileName, bool applyNWA, int verbosity) 
-  : mH_(mH),
-    mH2_(mH*mH),
+HttXsectionIntegrandStableHiggs::HttXsectionIntegrandStableHiggs(double sqrtS, double mH, const std::string& pdfFileName, bool applyNWA, int mode, const std::string& madgraphFileName, int verbosity) 
+  : mode_(mode),
+    mH_(mH),
+    mH2_(mH*mH), 
+    GammaH_(1.e-2*mH_),
     sqrtS_(sqrtS),
     s_(square(sqrtS_)),
     invSqrtS_(1./sqrtS_),
     applyNWA_(applyNWA),
     beamAxis_(0., 0., 1.),
-    me_madgraph_(applyNWA_),
-    me_lit_(applyNWA_),
+    me_madgraph_(applyNWA_, false),
+    me_madgraph_isInitialized_(false),
+    me_lit_(applyNWA_, false),
     verbosity_(verbosity)
 {
   if ( verbosity_ ) {
@@ -36,15 +39,21 @@ HttXsectionIntegrandStableHiggs::HttXsectionIntegrandStableHiggs(const std::stri
     pdfIsInitialized_ = true;
   }
 
-  // initialize Madgraph
-  me_madgraph_.initProc(madgraphFileName);
+   // initialize Madgraph
+  if ( madgraphFileName != "" ) {
+    me_madgraph_.initProc(madgraphFileName);
+    me_madgraph_isInitialized_ = true;
+  } else if ( mode_ == kMadgraph ) {
+    std::cerr << "Error in <HttXsectionIntegrandStableTaus>: No param.dat file for Madgraph given !!" << std::endl;
+    assert(0);
+  }
+  if ( mode == kMadgraph ) {
+    GammaH_ = me_madgraph_.getHiggsWidth();
+  }
 
   me_lit_.setS(s_);
   me_lit_.setHiggsMass(mH_);
-  me_lit_.setHiggsWidth(1.e-2*mH_);  
-  me_lit_.setBR(1.);
-  //const double v = 246.22; // GeV
-  //me_lit_.setBR(square(tauLeptonMass/v)); // square of Higgs-tau Yukawa coupling
+  me_lit_.setHiggsWidth(GammaH_);
 
   madgraphGluon1P4_ = new double[4];
   madgraphGluon1P4_[1] = 0.;
@@ -65,6 +74,7 @@ HttXsectionIntegrandStableHiggs::HttXsectionIntegrandStableHiggs(const std::stri
 
 HttXsectionIntegrandStableHiggs::~HttXsectionIntegrandStableHiggs()
 {
+  std::cout << "<HttXsectionIntegrandStableHiggs::~HttXsectionIntegrandStableHiggs>:" << std::endl;
   delete [] madgraphGluon1P4_;
   delete [] madgraphGluon2P4_;
   delete [] madgraphTau1P4_;
@@ -80,16 +90,14 @@ HttXsectionIntegrandStableHiggs::Eval(const double* x) const
   
   double tk = ( applyNWA_ ) ? 0. : x[1];
 
-  double GammaH = me_madgraph_.getHiggsWidth();
-  //double GammaH = 1.e-2*mH_;
-  if ( TMath::Abs(me_madgraph_.getHiggsMass() - mH_) > 1.e-3*mH_ ) {
+  if ( me_madgraph_isInitialized_ && TMath::Abs(me_madgraph_.getHiggsMass() - mH_) > 1.e-3*mH_ ) {
     std::cerr << "Error: Higgs mass defined in Madgraph = " << me_madgraph_.getHiggsMass() << " does not match mH = " << mH_ << " !!" << std::endl;
     assert(0);
   }
-  double q2 = mH2_ + mH_*GammaH*TMath::Tan(tk);
+  double q2 = mH2_ + mH_*GammaH_*TMath::Tan(tk);
   if ( q2 <= 0. ) return 0.;
   double q = TMath::Sqrt(q2);
-  double jacobiFactor = (square(q2 - mH2_) + mH2_*square(GammaH))/(mH_*GammaH); // dq2/dtk, taken from Eq. (8) in arXiv:1010.2263v3, with Pi factor removed from denominator after checking with Mathematica
+  double jacobiFactor = (square(q2 - mH2_) + mH2_*square(GammaH_))/(mH_*GammaH_); // dq2/dtk, taken from Eq. (8) in arXiv:1010.2263v3, with Pi factor removed from denominator after checking with Mathematica
 
   double tauP  = 0.5*q;
   double tauEn = TMath::Sqrt(square(tauP) + tauLeptonMass2);
@@ -122,13 +130,26 @@ HttXsectionIntegrandStableHiggs::Eval(const double* x) const
   madgraphTau2P4_[1] = 0.;
   madgraphTau2P4_[2] = 0.;
   madgraphTau2P4_[3] = -tauP;
-  me_madgraph_.setMomenta(madgraphMomenta_);
-  me_madgraph_.sigmaKin();
-  //double prob_ME = me_madgraph_.getMatrixElements()[0];
-  me_lit_.setHiggsWidth(GammaH);
+  double prob_ME_madgraph = -1.;
+  if ( me_madgraph_isInitialized_ ) {
+    me_madgraph_.setMomenta(madgraphMomenta_);
+    me_madgraph_.sigmaKin();
+    prob_ME_madgraph = me_madgraph_.getMatrixElements()[0];
+  }
   me_lit_.setMomenta(madgraphMomenta_);
-  double prob_ME = me_lit_.getMatrixElement();
-  //std::cout << "prob_ME: madgraph = " << me_madgraph_.getMatrixElements()[0] << ", lit = " << me_lit_.getMatrixElement() << std::endl;
+  double prob_ME_lit = me_lit_.getMatrixElement();
+  if ( verbosity_ >= 2 ) {
+    std::cout << "prob_ME: madgraph = " << prob_ME_madgraph << ", lit = " << prob_ME_lit << std::endl;
+  }
+  double prob_ME = 0.;
+  if ( mode_ == kMadgraph ) {
+    prob_ME = prob_ME_madgraph;
+  } else if ( mode_ == kLiterature ) {
+    prob_ME = prob_ME_lit;
+  } else {
+    assert(0);
+  }
+  assert(prob_ME >= 0.);
 
   // compute gg -> Higgs, Higgs -> tautau cross-section
   // according to Eq. (43) in http://www.itp.phys.ethz.ch/education/fs10/aft/Thesis_MB.pdf

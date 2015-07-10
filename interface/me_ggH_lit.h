@@ -13,7 +13,7 @@ class me_ggH_lit
 {
  public:
   // Constructor and destructor
-  me_ggH_lit(bool = false);
+  me_ggH_lit(bool = false, bool = true);
   ~me_ggH_lit();
 
   void setS(double s) 
@@ -44,11 +44,14 @@ class me_ggH_lit
 
   // Get matrix element.
   double getMatrixElement() const;
-  double getMatrixElement_woBWandBR() const;
+  double getMatrixElement_woHtoTauTauDecay() const;
 
  private:
   // flag to enable/disable narrow-width approximation
   bool applyNWA_;
+
+  // flag to include/not include Higgs -> tautau decay in matrix element
+  bool includeHtoTauTauDecay_;
 
   // center-of-mass energy
   double s_;
@@ -65,7 +68,8 @@ class me_ggH_lit
   bool br_isInitialized_;
 
   // Mass of tau lepton pair
-  mutable double sHat_;
+  mutable double q_;
+  mutable double q2_;
 
   // vector with momenta (to be changed each event)
   std::vector<double*> momenta_;

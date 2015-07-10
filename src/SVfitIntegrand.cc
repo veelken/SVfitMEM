@@ -13,8 +13,6 @@ namespace LHAPDF {
   double xfx(int nset, double x, double Q, int fl);
 }
 
-const double GF = 1.166e-5; // in units of GeV^-2, taken from http://pdg.lbl.gov/2014/reviews/rpp2014-rev-phys-constants.pdf
-
 /// global function pointer, needed for VEGAS integration
 const SVfitIntegrand* SVfitIntegrand::gSVfitIntegrand = 0;
 bool SVfitIntegrand::pdfIsInitialized_ = false;

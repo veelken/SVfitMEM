@@ -14,21 +14,23 @@ namespace LHAPDF {
 const HttXsectionIntegrandStableTaus* HttXsectionIntegrandStableTaus::gHttXsectionIntegrandStableTaus = 0;
 bool HttXsectionIntegrandStableTaus::pdfIsInitialized_ = false;
 
-HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus(const std::string& madgraphFileName, double sqrtS, double mH, const std::string& pdfFileName, int verbosity) 
-  : mH_(mH),
+HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus(double sqrtS, double mH, const std::string& pdfFileName, int mode, const std::string& madgraphFileName, int verbosity) 
+  : mode_(mode),
+    mH_(mH),
     mH2_(mH*mH),
     GammaH_(1.e-2*mH_),
     sqrtS_(sqrtS),
     s_(square(sqrtS_)),
     invSqrtS_(1./sqrtS_),
     beamAxis_(0., 0., 1.),
-    me_madgraph_(false),
-    me_lit_(false),
+    me_madgraph_(false, true),
+    me_madgraph_isInitialized_(false),
+    me_lit_(false, true),
     verbosity_(verbosity)
 {
-  //if ( verbosity_ ) {
+  if ( verbosity_ ) {
     std::cout << "<HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus>:" << std::endl;
-  //}
+  }
 
   // initialize PDF set
   if ( !pdfIsInitialized_ ) {
@@ -37,16 +39,20 @@ HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus(const std::string
   }
 
   // initialize Madgraph
-  me_madgraph_.initProc(madgraphFileName);
-  //GammaH_ = me_madgraph_.getHiggsWidth();
-  //std::cout << "mH = " << mH_ << ": GammaH = " << GammaH_ << std::endl;
+  if ( madgraphFileName != "" ) {
+    me_madgraph_.initProc(madgraphFileName);
+    me_madgraph_isInitialized_ = true;
+  } else if ( mode == kMadgraph ) {
+    std::cerr << "Error in <HttXsectionIntegrandStableTaus>: No param.dat file for Madgraph given !!" << std::endl;
+    assert(0);
+  }
+  if ( mode_ == kMadgraph ) {
+    GammaH_ = me_madgraph_.getHiggsWidth();
+  }
 
   me_lit_.setS(s_);
   me_lit_.setHiggsMass(mH_);
-  me_lit_.setHiggsWidth(GammaH_);
-  me_lit_.setBR(1.);
-  //const double v2 = square(246.22); // GeV^2
-  //me_lit_.setBR(2.*tauLeptonMass2/v2)*square(mH_)*(1. - 4.*tauLeptonMass2/square(mH_))); // square of Higgs-tau Yukawa coupling
+  me_lit_.setHiggsWidth(GammaH_); 
 
   madgraphGluon1P4_ = new double[4];
   madgraphGluon1P4_[1] = 0.;
@@ -67,6 +73,7 @@ HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus(const std::string
 
 HttXsectionIntegrandStableTaus::~HttXsectionIntegrandStableTaus()
 {
+  std::cout << "<HttXsectionIntegrandStableTaus::~HttXsectionIntegrandStableTaus>:" << std::endl;
   delete [] madgraphGluon1P4_;
   delete [] madgraphGluon2P4_;
   delete [] madgraphTau1P4_;
@@ -103,11 +110,11 @@ HttXsectionIntegrandStableTaus::Eval(const double* x) const
   double tau1P = TMath::Sqrt(tau1P2);
   double tk = x[3];
 
-  //GammaH_ = me_madgraph_.getHiggsWidth();
-  if ( TMath::Abs(me_madgraph_.getHiggsMass() - mH_) > 1.e-3*mH_ ) {
+  if ( me_madgraph_isInitialized_ && TMath::Abs(me_madgraph_.getHiggsMass() - mH_) > 1.e-3*mH_ ) {
     std::cerr << "Error: Higgs mass defined in Madgraph = " << me_madgraph_.getHiggsMass() << " does not match mH = " << mH_ << " !!" << std::endl;
     assert(0);
   }
+
   double q2 = mH2_ + mH_*GammaH_*TMath::Tan(tk);
   if ( q2 <= 0. ) return 0.;
   double jacobiFactor = (square(q2 - mH2_) + mH2_*square(GammaH_))/(mH_*GammaH_); // dq2/dtk, taken from Eq. (8) in arXiv:1010.2263v3, with Pi factor removed from denominator after checking with Mathematica
@@ -125,14 +132,14 @@ HttXsectionIntegrandStableTaus::Eval(const double* x) const
   double prob = 0.;
   if ( TMath::Abs(tau2Pz_p) <= sqrtS_ && absDgDp2z_p != 0. ) { 
     double prob_p = compProb(tau1Px, tau1Py, tau1Pz, tau2Px, tau2Py, tau2Pz_p, jacobiFactor/absDgDp2z_p);
-    if ( verbosity_ >= 2 ) {
+    if ( verbosity_ >= 3 ) {
       std::cout << "solution+: tau2Pz = " << tau2Pz_p << ", prob = " << prob_p << std::endl;
     }
     prob += prob_p;
   }
   if ( TMath::Abs(tau2Pz_m) <= sqrtS_ && absDgDp2z_m != 0. ) { 
     double prob_m = compProb(tau1Px, tau1Py, tau1Pz, tau2Px, tau2Py, tau2Pz_m, jacobiFactor/absDgDp2z_m);
-    if ( verbosity_ >= 2 ) {
+    if ( verbosity_ >= 3 ) {
       std::cout << "solution-: tau2Pz = " << tau2Pz_m << ", prob = " << prob_m << std::endl;
     }
     prob += prob_m;
@@ -167,16 +174,19 @@ HttXsectionIntegrandStableTaus::compProb(double tau1Px, double tau1Py, double ta
 
   // evaluate flux factor
   double prob_flux = (1./(2.*s_*xa*xb));  
-  
+
   // perform boost into MEM frame and evaluate LO matrix element, 
   // computed by Madgraph
+  double memFramePx = tau1Px + tau2Px;
+  double memFramePy = tau1Py + tau2Py;
+  double memFrameEn = tau1En + tau2En;
+  Vector boost(-memFramePx/memFrameEn, -memFramePy/memFrameEn, 0.);
+  //std::cout << "boost: Px = " << boost.x() << ", Py = " << boost.y() << ", Pz = " << boost.z() << std::endl;
   LorentzVector tau1P4(tau1Px, tau1Py, tau1Pz, tau1En);
+  LorentzVector tau1P4_mem = ROOT::Math::VectorUtil::boost(tau1P4, boost); 
   LorentzVector tau2P4(tau2Px, tau2Py, tau2Pz, tau2En);
-  LorentzVector comSystem = tau1P4 + tau2P4;
-  Vector boost = comSystem.BoostToCM();
-  LorentzVector tau1P4_rf = ROOT::Math::VectorUtil::boost(tau1P4, boost); 
-  LorentzVector tau2P4_rf = ROOT::Math::VectorUtil::boost(tau2P4, boost); 
-  if ( verbosity_ >= 2 ) {
+  LorentzVector tau2P4_mem = ROOT::Math::VectorUtil::boost(tau2P4, boost); 
+  if ( verbosity_ >= 3 ) {
     std::cout << "lab:" << std::endl;
     std::cout << " tau1: Pt = " << tau1P4.pt() << ", eta = " << tau1P4.eta() << ", phi = " << tau1P4.phi() << ", mass = " << tau1P4.mass() << std::endl;
     std::cout << "      (En = " << tau1P4.energy() << ", Px = " << tau1P4.px() << ", Py = " << tau1P4.py() << ", Pz = " << tau1P4.pz() << ")" << std::endl;    
@@ -184,45 +194,56 @@ HttXsectionIntegrandStableTaus::compProb(double tau1Px, double tau1Py, double ta
     std::cout << "      (En = " << tau2P4.energy() << ", Px = " << tau2P4.px() << ", Py = " << tau2P4.py() << ", Pz = " << tau2P4.pz() << ")" << std::endl;  
     LorentzVector ditauP4 = tau1P4 + tau2P4;
     std::cout << " ditau: Pt = " << ditauP4.pt() << ", eta = " << ditauP4.eta() << ", phi = " << ditauP4.phi() << ", mass = " << ditauP4.mass() << std::endl;
-    std::cout << "rf:" << std::endl;
-    std::cout << " tau1: Pt = " << tau1P4_rf.pt() << ", eta = " << tau1P4_rf.eta() << ", phi = " << tau1P4_rf.phi() << ", mass = " << tau1P4_rf.mass() << std::endl;
-    std::cout << "      (En = " << tau1P4_rf.energy() << ", Px = " << tau1P4_rf.px() << ", Py = " << tau1P4_rf.py() << ", Pz = " << tau1P4_rf.pz() << ")" << std::endl;  
-    std::cout << " tau2: Pt = " << tau2P4_rf.pt() << ", eta = " << tau2P4_rf.eta() << ", phi = " << tau2P4_rf.phi() << ", mass = " << tau2P4_rf.mass() << std::endl;
-    std::cout << "      (En = " << tau2P4_rf.energy() << ", Px = " << tau2P4_rf.px() << ", Py = " << tau2P4_rf.py() << ", Pz = " << tau2P4_rf.pz() << ")" << std::endl;  
-    LorentzVector ditauP4_rf = tau1P4_rf + tau2P4_rf;
-    std::cout << " ditau: Pt = " << ditauP4_rf.pt() << ", eta = " << ditauP4_rf.eta() << ", phi = " << ditauP4_rf.phi() << ", mass = " << ditauP4_rf.mass() << std::endl;
+    std::cout << "mem:" << std::endl;
+    std::cout << " tau1: Pt = " << tau1P4_mem.pt() << ", eta = " << tau1P4_mem.eta() << ", phi = " << tau1P4_mem.phi() << ", mass = " << tau1P4_mem.mass() << std::endl;
+    std::cout << "      (En = " << tau1P4_mem.energy() << ", Px = " << tau1P4_mem.px() << ", Py = " << tau1P4_mem.py() << ", Pz = " << tau1P4_mem.pz() << ")" << std::endl;  
+    std::cout << " tau2: Pt = " << tau2P4_mem.pt() << ", eta = " << tau2P4_mem.eta() << ", phi = " << tau2P4_mem.phi() << ", mass = " << tau2P4_mem.mass() << std::endl;
+    std::cout << "      (En = " << tau2P4_mem.energy() << ", Px = " << tau2P4_mem.px() << ", Py = " << tau2P4_mem.py() << ", Pz = " << tau2P4_mem.pz() << ")" << std::endl;  
+    LorentzVector ditauP4_mem = tau1P4_mem + tau2P4_mem;
+    std::cout << " ditau: Pt = " << ditauP4_mem.pt() << ", eta = " << ditauP4_mem.eta() << ", phi = " << ditauP4_mem.phi() << ", mass = " << ditauP4_mem.mass() << std::endl;
   }
-  madgraphGluon1P4_[0] =  0.5*Q; 
-  madgraphGluon1P4_[3] = +0.5*Q;
-  madgraphGluon2P4_[0] =  0.5*Q;
-  madgraphGluon2P4_[3] = -0.5*Q;
-  madgraphTau1P4_[0] = tau1P4_rf.energy();
-  madgraphTau1P4_[1] = tau1P4_rf.px();
-  madgraphTau1P4_[2] = tau1P4_rf.py();
-  madgraphTau1P4_[3] = tau1P4_rf.pz();
-  madgraphTau2P4_[0] = tau2P4_rf.energy();
-  madgraphTau2P4_[1] = tau2P4_rf.px();
-  madgraphTau2P4_[2] = tau2P4_rf.py();
-  madgraphTau2P4_[3] = tau2P4_rf.pz();
-  me_madgraph_.setMomenta(madgraphMomenta_);
-  me_madgraph_.sigmaKin();
-  //double prob_ME = me_madgraph_.getMatrixElements()[0];
-  me_lit_.setHiggsWidth(GammaH_);
+  madgraphGluon1P4_[0] =  0.5*xa*sqrtS_; 
+  madgraphGluon1P4_[3] = +0.5*xa*sqrtS_;
+  madgraphGluon2P4_[0] =  0.5*xb*sqrtS_;
+  madgraphGluon2P4_[3] = -0.5*xb*sqrtS_;
+  madgraphTau1P4_[0] = tau1P4_mem.energy();
+  madgraphTau1P4_[1] = tau1P4_mem.px();
+  madgraphTau1P4_[2] = tau1P4_mem.py();
+  madgraphTau1P4_[3] = tau1P4_mem.pz();
+  madgraphTau2P4_[0] = tau2P4_mem.energy();
+  madgraphTau2P4_[1] = tau2P4_mem.px();
+  madgraphTau2P4_[2] = tau2P4_mem.py();
+  madgraphTau2P4_[3] = tau2P4_mem.pz();
+  double prob_ME_madgraph = -1.;
+  if ( me_madgraph_isInitialized_ ) {
+    me_madgraph_.setMomenta(madgraphMomenta_);
+    me_madgraph_.sigmaKin();
+    prob_ME_madgraph = me_madgraph_.getMatrixElements()[0];
+  }
   me_lit_.setMomenta(madgraphMomenta_);
-  double prob_ME = me_lit_.getMatrixElement();
-  //std::cout << "prob_ME: madgraph = " << me_madgraph_.getMatrixElements()[0] << ", lit = " << me_lit_.getMatrixElement() << std::endl;
+  double prob_ME_lit = me_lit_.getMatrixElement();
+  if ( verbosity_ >= 2 ) {
+    std::cout << "prob_ME: madgraph = " << prob_ME_madgraph << ", lit = " << prob_ME_lit << std::endl;
+  }
+  double prob_ME = 0.;
+  if ( mode_ == kMadgraph ) {
+    prob_ME = prob_ME_madgraph;
+  } else if ( mode_ == kLiterature ) {
+    prob_ME = prob_ME_lit;
+  } else {
+    assert(0);
+  }
   assert(prob_ME >= 0.);
-
-  const double hbar_c = 0.1973; // GeV fm
+  
   const double conversionFactor = 1.e+10*square(hbar_c); // conversion factor from GeV^-2 to picobarn = 10^-40m
   const double constFactor = conversionFactor/(8.*square(TMath::Pi()));
   double prob_PS = constFactor/(s_*tau1En*tau2En);
 
   double prob = prob_flux*prob_PDF*prob_ME*prob_PS*jacobiFactor;
   assert(prob >= 0.);
-  if ( verbosity_ >= 1 ) {
+  //if ( verbosity_ >= 1 ) {
     std::cout << "prob: flux = " << prob_flux << ", PDF = " << prob_PDF << ", ME = " << prob_ME << ", PS = " << prob_PS << ", Jacobi = " << jacobiFactor
 	      << " --> returning " << prob << std::endl;
-  }
+  //}
   return prob;
 }

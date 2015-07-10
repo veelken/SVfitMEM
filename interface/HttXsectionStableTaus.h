@@ -12,11 +12,11 @@
 class HttXsectionStableTaus
 {
  public:
-  HttXsectionStableTaus(const std::string&, double, double, const std::string&, int = 0);
+  HttXsectionStableTaus(double, double, const std::string&, int = HttXsectionIntegrandStableTaus::kLiterature, const std::string& = "", int = 0); 
   ~HttXsectionStableTaus();
 
   /// set Higgs -> tautau decay branching fraction
-    void setBR(double);
+  void setBR(double br) { integrand_->setBR(br); }
 
   /// number of function calls for VEGAS integration (default is 10000)
   void setMaxObjFunctionCalls(unsigned value) 
@@ -37,7 +37,9 @@ class HttXsectionStableTaus
 
  protected:
 
-  svFitMEM::HttXsectionIntegrandStableTaus* integrand_;
+  int mode_; // use either matrix element obtained from Madgraph or from literature ( http://www.itp.phys.ethz.ch/education/fs10/aft/Thesis_MB.pdf )
+
+  HttXsectionIntegrandStableTaus* integrand_;
   double sqrtS_;
   double mH_;
 

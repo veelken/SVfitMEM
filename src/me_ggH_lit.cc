@@ -14,8 +14,9 @@ namespace LHAPDF {
   double alphasPDF(int nset, double Q);
 }
 
-me_ggH_lit::me_ggH_lit(bool applyNWA)
+me_ggH_lit::me_ggH_lit(bool applyNWA, bool includeHtoTauTauDecay)
   : applyNWA_(applyNWA),
+    includeHtoTauTauDecay_(includeHtoTauTauDecay),
     s_(0.),
     s_isInitialized_(false),
     mH_(0.),
@@ -34,22 +35,35 @@ me_ggH_lit::~me_ggH_lit()
 double me_ggH_lit::getMatrixElement() const
 {
   //std::cout << "<me_ggH_lit::getMatrixElement>:" << std::endl;
-  double me = getMatrixElement_woBWandBR();
+  double me = getMatrixElement_woHtoTauTauDecay();
   const double one_over_Pi = 1./TMath::Pi();
-  double GammaH_div_mH = GammaH_/mH_;
-  if ( !applyNWA_ ) {
-    //me *= (one_over_Pi*sHat_*GammaH_div_mH/(square(sHat_ - mH2_) + square(sHat_*GammaH_div_mH)));
-    me *= (one_over_Pi*mH2_*GammaH_div_mH/(square(sHat_ - mH2_) + square(mH2_*GammaH_div_mH)));
+  double GammaH_times_mH = GammaH_*mH_;
+  if ( includeHtoTauTauDecay_ ) {
+    if ( !br_isInitialized_ ) {
+      std::cerr << "Error in <me_ggH_lit::getMatrixElement_woBWandBR>: Branching ratio for decay of Higgs into taus has not been initialized !!" << std::endl;
+      assert(0);
+    }
+    double meHtoTauTau_q2 = 2.*(tauLeptonMass2/v2)*q2_*(1. - 4.*tauLeptonMass2/q2_);    
+    me *= meHtoTauTau_q2;    
+    if ( !applyNWA_ ) {
+      me *= (one_over_Pi*GammaH_times_mH/(square(q2_ - mH2_) + square(GammaH_times_mH)));
+    }
+    double meHtoTauTau_mH = 2.*(tauLeptonMass2/v2)*mH2_*(1. - 4.*tauLeptonMass2/mH2_);   
+    double GammaHtoTauTau = meHtoTauTau_mH/(16.*TMath::Pi()*mH_);
+    double GammaH_times_mH_fromBR = (GammaHtoTauTau/br_)*mH_;
+    me /= (one_over_Pi*GammaH_times_mH_fromBR);
+  } else {
+    if ( !applyNWA_ ) {
+      me *= (one_over_Pi*GammaH_times_mH/(square(q2_ - mH2_) + square(GammaH_times_mH)));
+    }
   }
-  //std::cout << "br = " << br_ << std::endl;
-  me *= br_;
   return me;
 }
 
-double me_ggH_lit::getMatrixElement_woBWandBR() const
+double me_ggH_lit::getMatrixElement_woHtoTauTauDecay() const
 {
-  if ( !(mH_isInitialized_ && GammaH_isInitialized_ && br_isInitialized_) ) {
-    std::cerr << "Error in <me_ggH_lit::getMatrixElement_woBWandBR>: Higgs mass, width and branching fraction have not been initialized !!" << std::endl;
+  if ( !(mH_isInitialized_ && GammaH_isInitialized_) ) {
+    std::cerr << "Error in <me_ggH_lit::getMatrixElement_woBWandBR>: Higgs mass and width have not been initialized !!" << std::endl;
     assert(0);
   }
 
@@ -58,11 +72,10 @@ double me_ggH_lit::getMatrixElement_woBWandBR() const
   LorentzVector tau1P4(madgraphTau1P4[1], madgraphTau1P4[2], madgraphTau1P4[3], madgraphTau1P4[0]);
   const double* madgraphTau2P4 = momenta_[3];
   LorentzVector tau2P4(madgraphTau2P4[1], madgraphTau2P4[2], madgraphTau2P4[3], madgraphTau2P4[0]);
-  sHat_ = square((tau1P4 + tau2P4).mass());
+  q_ = (tau1P4 + tau2P4).mass();
+  q2_ = square(q_);
 
-  //double tau = 4.*mtop2/sHat_;
-  double tau = 4.*mtop2/mH2_;
-  //std::cout << "mH2 = " << mH2_ << ", sHat = " << sHat_ << std::endl;
+  double tau = 4.*mtop2/q2_;
   
   double Re_f = 0.;
   double Im_f = 0.;
@@ -82,12 +95,10 @@ double me_ggH_lit::getMatrixElement_woBWandBR() const
 
   const double GF = 1.166e-5; // in units of GeV^-2, taken from http://pdg.lbl.gov/2014/reviews/rpp2014-rev-phys-constants.pdf
   const double constFactor = TMath::Sqrt(2)*GF/(256.*square(TMath::Pi()));
-  double Q = mH_;
+  double Q = q_;
   double alphaS = LHAPDF::alphasPDF(1, Q);
   //std::cout << "Q = " << Q << ": alphaS = " << alphaS << std::endl;
-  double me = constFactor*square(alphaS)*square(tau)*square(sHat_)*(square(1. + (1. - tau)*Re_f) + square((1. - tau)*Im_f));
-  //double f = square(TMath::ASin(1./TMath::Sqrt(tau)));
-  //double me = (TMath::Sqrt(2)*GF*square(alphaS)*square(tau)*square(sHat_)/(256.*square(TMath::Pi())))*square(1. + (1. - tau)*f);
+  double me = constFactor*square(alphaS)*square(tau)*square(q2_)*(square(1. + (1. - tau)*Re_f) + square((1. - tau)*Im_f));
   //std::cout << "me = " << me << std::endl;
   return me;
 }

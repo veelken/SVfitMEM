@@ -26,6 +26,14 @@ namespace LHAPDF {
 // *   Decay: h > ta- ta+ WEIGHTED=2 HIW=1 HIG=1
 
 //--------------------------------------------------------------------------
+// Constructor
+
+me_ggH_mg5::me_ggH_mg5(bool applyNWA, bool includeHtoTauTauDecay)
+  : applyNWA_(applyNWA),
+    includeHtoTauTauDecay_(includeHtoTauTauDecay)
+{}
+
+//--------------------------------------------------------------------------
 // Initialize process.
 
 void me_ggH_mg5::initProc(const string& param_card_name) 
@@ -144,14 +152,24 @@ void me_ggH_mg5::sigmaKin()
     }
   }
 
-  for (int i = 0; i < nprocesses; i++ )
-    matrix_element[i] /= denominators[i]; 
+  for (int i = 0; i < nprocesses; i++ ) {
+    matrix_element[i] /= denominators[i];
+  }
 
+  double mH = this->getHiggsMass();
+  double GammaH = this->getHiggsWidth();
+  const double one_over_Pi = 1./TMath::Pi();
+  double GammaH_times_mH = GammaH*mH;
   if ( applyNWA_ ) {
-    const double one_over_Pi = 1./TMath::Pi();
-    double GammaH_times_mH = this->getHiggsWidth()*this->getHiggsMass();
-    for (int i = 0; i < nprocesses; i++ )
+    for (int i = 0; i < nprocesses; i++ ) {
       matrix_element[i] *= (one_over_Pi*GammaH_times_mH);
+    }
+  }
+  if ( !includeHtoTauTauDecay_ ) {
+    for (int i = 0; i < nprocesses; i++ ) {
+      matrix_element[i] /= 2.*(tauLeptonMass2/v2)*square(mH)*(1. - 4.*tauLeptonMass2/square(mH));    
+      matrix_element[i] *= (one_over_Pi*GammaH_times_mH);
+    }
   }
 }
 

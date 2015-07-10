@@ -16,10 +16,12 @@ namespace
   }
 }
 
-HttXsectionWithTauDecays::HttXsectionWithTauDecays(const std::string& madgraphFileName, double sqrtS, double mH, const std::string& pdfFileName, int verbosity) 
-  : integrand_(0),
+HttXsectionWithTauDecays::HttXsectionWithTauDecays(double sqrtS, double mH, const std::string& pdfFileName, int mode, const std::string& madgraphFileName, int verbosity) 
+  : applyMEtTF_(false),
+    integrand_(0),
     sqrtS_(sqrtS),
     mH_(mH),
+    mH2_(mH_*mH_),
     vegasIntegrand_(0),
     vegasWorkspace_(0),
     vegasRnd_(0),
@@ -35,10 +37,24 @@ HttXsectionWithTauDecays::HttXsectionWithTauDecays(const std::string& madgraphFi
     lutVisPtResDM0_(0),
     lutVisPtResDM1_(0),
     lutVisPtResDM10_(0),
+    clock_(0),
     verbosity_(verbosity)
 { 
-  integrand_ = new HttXsectionIntegrandWithTauDecays(madgraphFileName, sqrtS_, pdfFileName, verbosity_);
-  integrand_->setMtest(mH);
+  integrand_ = new HttXsectionIntegrandWithTauDecays(sqrtS_, mH_, pdfFileName, mode, madgraphFileName, verbosity_);
+  integrand_->setApplyMEtTF(applyMEtTF_);
+
+  xl_vis1P_  = 0.;
+  xu_vis1P_  = 1.e+3;
+  xl_vis1Px_ = -1.0*0.5*mH_;
+  xu_vis1Px_ = +1.0*0.5*mH_;
+  xl_vis1Py_ = -1.0*0.5*mH_;
+  xu_vis1Py_ = +1.0*0.5*mH_;
+  xl_mVis2_  = 0.;
+  xu_mVis2_  = 2.*mH2_;
+  xl_vis2Px_ = -1.0*0.5*mH_;
+  xu_vis2Px_ = +1.0*0.5*mH_;
+  xl_vis2Py_ = -1.0*0.5*mH_;
+  xu_vis2Py_ = +1.0*0.5*mH_;
 
   clock_ = new TBenchmark();
 }
@@ -82,13 +98,13 @@ HttXsectionWithTauDecays::shiftVisPt(bool value, TFile* inputFile)
 }
 
 void
-HttXsectionWithTauDecays::integrate(int tau1Type, int tau1DecayMode, double tau1Mass, int tau2Type, int tau2DecayMode, double tau2Mass, const TMatrixD& covMET)
+HttXsectionWithTauDecays::integrate(int tau1Type, int tau1DecayMode, double vis1Mass, int tau2Type, int tau2DecayMode, double vis2Mass, const TMatrixD& covMET)
 {
   if ( verbosity_ >= 1 ) {
     std::cout << "<HttXsectionWithTauDecays::integrate>:" << std::endl;
     clock_->Start("<HttXsectionWithTauDecays::integrate>");
   }
-  
+
 //--- determine dimension of integration space 
   int idxLeg1_t = -1;
   int idxLeg1_phi = -1;
@@ -102,7 +118,10 @@ HttXsectionWithTauDecays::integrate(int tau1Type, int tau1DecayMode, double tau1
   int idxLeg2_mNuNu = -1;
   const TH1* leg2lutVisPtRes = 0;
 
-  numDimensions_ = 8; // P, theta, phi of visTau1 and visTau2; Px and Py components of missing-ET
+  numDimensions_ = 6; // Px, Py, Pz of visTau1 and visTau2
+  if ( applyMEtTF_ ) {
+    numDimensions_ += 2; // Px and Py components of missing-ET
+  }
   
   idxLeg1_t = numDimensions_;
   numDimensions_ += 1;
@@ -155,7 +174,7 @@ HttXsectionWithTauDecays::integrate(int tau1Type, int tau1DecayMode, double tau1
     numDimensions_ += 1;
   }
 
-  integrand_->setInputs(tau1Type, tau1Mass, tau2Type, tau2Mass, covMET);
+  integrand_->setInputs(tau1Type, vis1Mass, tau2Type, vis2Mass, covMET);
   integrand_->shiftVisPt(shiftVisPt_, leg1lutVisPtRes, leg2lutVisPtRes);
   integrand_->setIdxLeg1_t(idxLeg1_t);
   integrand_->setIdxLeg1_phi(idxLeg1_phi);
@@ -175,26 +194,48 @@ HttXsectionWithTauDecays::integrate(int tau1Type, int tau1DecayMode, double tau1
   gsl_rng_env_setup();
   vegasRnd_ = gsl_rng_alloc(gsl_rng_default);
   gsl_rng_set(vegasRnd_, 12345); 
-  
+
   //std::cout << "numDimensions = " << numDimensions_ << std::endl;
   xl_ = new double[numDimensions_];
   xu_ = new double[numDimensions_];
-  xl_[0] = tau1Mass;                    // vis1E
-  xu_[0] = 1.e+3;
-  xl_[1] = 0.;                          // vis1Theta
-  xu_[1] = TMath::Pi();
-  xl_[2] = -TMath::Pi();                // vis1Phi
-  xu_[2] = +TMath::Pi();
-  xl_[3] = square(tau1Mass + tau2Mass); // qVis2
-  xu_[3] = square(2.*mH_);
-  xl_[4] = 0.;                          // vis2Theta
+  //-----------------------------------------------------------------------------
+  // CV: integrate over momenta of visible tau decay products
+  //     using Cartesian coordinates
+  xl_[0] = xl_vis1Px_;   // vis1Px
+  xu_[0] = xu_vis1Px_;
+  xl_[1] = xl_vis1Py_;   // vis1Py
+  xu_[1] = xu_vis1Py_;
+  xl_[2] = -sqrtS_;      // vis1Pz 
+  xu_[2] = +sqrtS_;
+  //xl_[3] = xl_vis2Px_;   // vis2Px
+  //xu_[3] = xu_vis2Px_;
+  //xl_[4] = xl_vis2Py_;   // vis2Py
+  //xu_[4] = xu_vis2Py_;
+  //xl_[5] = -sqrtS_;      // vis2Pz 
+  //xu_[5] = +sqrtS_;
+  //-----------------------------------------------------------------------------
+  //-----------------------------------------------------------------------------
+  // CV: integrate over momenta of visible tau decay products
+  //     using polar coordinates
+  //xl_[0] = xl_vis1P_;    // vis1P
+  //xu_[0] = xu_vis1P_;
+  //xl_[1] = 0.;           // vis1Theta
+  //xu_[1] = TMath::Pi();
+  //xl_[2] = -TMath::Pi(); // vis1Phi
+  //xu_[2] = +TMath::Pi();
+  xl_[3] = xl_mVis2_;    // mVis^2
+  xu_[3] = xu_mVis2_;
+  xl_[4] = 0.;           // vis2Theta
   xu_[4] = TMath::Pi();
-  xl_[5] = -TMath::Pi();                // vis2Phi
+  xl_[5] = -TMath::Pi(); // vis2Phi
   xu_[5] = +TMath::Pi();
-  xl_[6] = -100.;                       // MET: recPx - genPx
-  xu_[6] = +100.;        
-  xl_[7] = -100.;                       // MET: recPy - genPy
-  xu_[7] = +100.;  
+  //-----------------------------------------------------------------------------
+  if ( applyMEtTF_ ) {
+    xl_[6] = -100.;      // MET: recPx - genPx
+    xu_[6] = +100.;        
+    xl_[7] = -100.;      // MET: recPy - genPy
+    xu_[7] = +100.;  
+  }
   xl_[idxLeg1_t] = -0.5*TMath::Pi();
   xu_[idxLeg1_t] = +0.5*TMath::Pi();
   xl_[idxLeg1_phi] = -TMath::Pi();
@@ -257,6 +298,33 @@ HttXsectionWithTauDecays::integrate(int tau1Type, int tau1DecayMode, double tau1
   delete vegasIntegrand_;
   gsl_monte_vegas_free(vegasWorkspace_);
   gsl_rng_free(vegasRnd_);
+
+  // CV: The LO cross-section assumes that the Higgs has zero zero transverse momentum,
+  //     corresponding to a delta-function 
+  //      delta(tau1Px - tau2Px) * delta(tau1Px - tau2Px) 
+  //    = delta(visPtShift1*vis1Px/x1 - visPtShift2*vis2Px/x2) * delta(visPtShift1*vis1Py/x1 - visPtShift2*vis2Py/x2)
+  //    = (x2/visPtShift2)^2 * delta(visPtShift1*vis1Px*x2/(x1*visPtShift2) - vis2Px) * delta(visPtShift1*vis1Py*x2/(x1*visPtShift2) - vis2Py)
+  //     where the delta-function rule: delta(alpha x) = 1/|alpha| * delta(x) has been used, cf. https://en.wikipedia.org/wiki/Dirac_delta_function 
+  //
+  //     Instead of including the delta-functions into the numeric integration,
+  //     we correct the integral by the following means:
+  //      1) in HttXsectionIntegrandWithTauDecays::Eval we multiply the integrand by the factor (x2/visPtShift2)^2
+  //      2) in HttXsectionWithTauDecays::integrate we multiply the value of the integral by a factor 1/((xu_vis2Px - xl_vis2Px)*(xu_vis2Py - xl_vis2Py))
+  //
+  //     Note that as we boost all four-vectors into the MEM frame, the integrand is constant for all values of vis2Px and vis2Py
+  //
+  //-----------------------------------------------------------------------------
+  // CV: factor for the case that integral over momenta of visible tau decay products
+  //     is computed using Cartesian coordinates
+  double memFrameFactor = 1./((xu_vis1Px_ - xl_vis1Px_)*(xu_vis1Py_ - xl_vis1Py_));
+  //-----------------------------------------------------------------------------
+  //-----------------------------------------------------------------------------
+  // CV: factor for the case that integral over momenta of visible tau decay products
+  //     is computed using polar coordinates
+  //double memFrameFactor = 1./square(0.75*(xu_mVis2_ - xl_mVis2_));
+  //-----------------------------------------------------------------------------
+  xSection_ *= memFrameFactor;
+  xSectionErr_ *= memFrameFactor;
 
   if ( verbosity_ >= 1 ) {
     clock_->Show("<HttXsectionWithTauDecays::integrate>");

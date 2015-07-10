@@ -15,8 +15,9 @@ namespace
   }
 }
 
-HttXsectionStableTaus::HttXsectionStableTaus(const std::string& madgraphFileName, double sqrtS, double mH, const std::string& pdfFileName, int verbosity) 
-  : integrand_(0),
+HttXsectionStableTaus::HttXsectionStableTaus(double sqrtS, double mH, const std::string& pdfFileName, int mode, const std::string& madgraphFileName, int verbosity) 
+  : mode_(mode),
+    integrand_(0),
     sqrtS_(sqrtS),
     mH_(mH),
     vegasIntegrand_(0),
@@ -33,9 +34,10 @@ HttXsectionStableTaus::HttXsectionStableTaus(const std::string& madgraphFileName
     numDimensions_(4),
     xl_(0),
     xu_(0),
+    clock_(0),
     verbosity_(verbosity)
 { 
-  integrand_ = new HttXsectionIntegrandStableTaus(madgraphFileName, sqrtS_, mH_, pdfFileName, verbosity_);
+  integrand_ = new HttXsectionIntegrandStableTaus(sqrtS_, mH_, pdfFileName, mode, madgraphFileName, verbosity_);
 
   clock_ = new TBenchmark();
 }
@@ -45,22 +47,6 @@ HttXsectionStableTaus::~HttXsectionStableTaus()
   delete integrand_;
 
   delete clock_;
-}
-
-void HttXsectionStableTaus::setBR(double br)
-{
-  //integrand_->setBR(br);
-  //return;
-  //std::cout << "<HttXsectionStableTaus::setBR>:" << std::endl;
-  //std::cout << " mH = " << mH_ << ": GammaH = " << integrand_->GammaH() << ", br = " << br << std::endl;
-  double me2_1 = 16.*TMath::Pi()*integrand_->GammaH()*br*mH_ /* *2./3. */;
-  //const double v2 = square(246.22); // GeV^2
-  //double me2_2 = 2.*(tauLeptonMass2/v2)*square(mH_)*(1. - 4.*tauLeptonMass2/square(mH_));
-  //std::cout << "me2: (1) = " << me2_1 << ", (2) = " << me2_2 << std::endl;
-  const double one_over_Pi = 1./TMath::Pi();
-  double GammaH_times_mH = integrand_->GammaH()*mH_;
-  me2_1 /= (one_over_Pi*GammaH_times_mH);
-  integrand_->setBR(me2_1);
 }
 
 void

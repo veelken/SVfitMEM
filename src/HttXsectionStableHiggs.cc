@@ -15,8 +15,9 @@ namespace
   }
 }
 
-HttXsectionStableHiggs::HttXsectionStableHiggs(const std::string& madgraphFileName, double sqrtS, double mH, const std::string& pdfFileName, bool applyNWA, int verbosity) 
-  : integrand_(0),
+HttXsectionStableHiggs::HttXsectionStableHiggs(double sqrtS, double mH, const std::string& pdfFileName, bool applyNWA, int mode, const std::string& madgraphFileName, int verbosity) 
+  : mode_(mode),
+    integrand_(0),
     sqrtS_(sqrtS),
     mH_(mH),
     applyNWA_(applyNWA),
@@ -33,9 +34,10 @@ HttXsectionStableHiggs::HttXsectionStableHiggs(const std::string& madgraphFileNa
     precision_(1.e-2),
     xl_(0),
     xu_(0),
+    clock_(0),
     verbosity_(verbosity)
 { 
-  integrand_ = new HttXsectionIntegrandStableHiggs(madgraphFileName, sqrtS_, mH_, pdfFileName, applyNWA_, verbosity_);
+  integrand_ = new HttXsectionIntegrandStableHiggs(sqrtS_, mH_, pdfFileName, applyNWA_, mode_, madgraphFileName, verbosity_);
 
   numDimensions_ = ( applyNWA_ ) ? 1 : 2;
 

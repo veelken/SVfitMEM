@@ -7,48 +7,54 @@
 
 #include <TMatrixD.h>
 
-namespace svFitMEM
+class HttXsectionIntegrandStableHiggs
 {
-  class HttXsectionIntegrandStableHiggs
-  {
-   public:
-    HttXsectionIntegrandStableHiggs(const std::string&, double, double, const std::string&, bool, int);
-    ~HttXsectionIntegrandStableHiggs();
+ public:
+  HttXsectionIntegrandStableHiggs(double, double, const std::string&, bool, int, const std::string&, int);
+  ~HttXsectionIntegrandStableHiggs();
   
-    /// evaluate integrand for given value of integration variables x
-    double Eval(const double* x) const;
+  /// set Higgs -> tautau decay branching fraction
+  void setBR(double br) { me_lit_.setBR(br); }
 
-    // get Higgs width from Madgraph
-    double GammaH() const { return me_madgraph_.getHiggsWidth(); }	
+  /// evaluate integrand for given value of integration variables x
+  double Eval(const double* x) const;
 
-    /// static pointer to this (needed for interfacing the likelihood function calls to VEGAS integration)
-    static const HttXsectionIntegrandStableHiggs* gHttXsectionIntegrandStableHiggs;
+  // get Higgs width from Madgraph
+  double GammaH() const { return GammaH_; }
 
-   protected:
-    double mH_;
-    double mH2_;
+  /// static pointer to this (needed for interfacing the likelihood function calls to VEGAS integration)
+  static const HttXsectionIntegrandStableHiggs* gHttXsectionIntegrandStableHiggs;
+    
+  enum { kMadgraph, kLiterature };
 
-    double sqrtS_;
-    double s_;
-    double invSqrtS_;
-
-    bool applyNWA_;
-
-    Vector beamAxis_;
-
-    static bool pdfIsInitialized_;
-
-    mutable me_ggH_mg5 me_madgraph_;
-    mutable me_ggH_lit me_lit_;
-    double* madgraphGluon1P4_;
-    double* madgraphGluon2P4_;
-    double* madgraphTau1P4_;
-    double* madgraphTau2P4_;
-    mutable vector<double*> madgraphMomenta_;
-
-    /// verbosity level
-    int verbosity_;
-  };
-}
+ protected:
+  int mode_;
+  
+  double mH_;
+  double mH2_;
+  double GammaH_;
+  
+  double sqrtS_;
+  double s_;
+  double invSqrtS_;
+  
+  bool applyNWA_;
+  
+  svFitMEM::Vector beamAxis_;
+  
+  static bool pdfIsInitialized_;
+  
+  mutable me_ggH_mg5 me_madgraph_;
+  bool me_madgraph_isInitialized_;
+  mutable me_ggH_lit me_lit_;
+  double* madgraphGluon1P4_;
+  double* madgraphGluon2P4_;
+  double* madgraphTau1P4_;
+  double* madgraphTau2P4_;
+  mutable vector<double*> madgraphMomenta_;
+  
+  /// verbosity level
+  int verbosity_;
+};
 
 #endif
