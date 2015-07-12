@@ -28,11 +28,11 @@ class HttXsectionIntegrandWithTauDecays
     acceptance_ = 0;
   }
   
-  void setIdxLeg1_t(int idx) { idxLeg1_t_ = idx; }
+  void setIdxLeg1_X(int idx) { idxLeg1_X_ = idx; }
   void setIdxLeg1_phi(int idx) { idxLeg1_phi_ = idx; }
   void setIdxLeg1VisPtShift(int idx) { idxLeg1VisPtShift_ = idx; }
   void setIdxLeg1_mNuNu(int idx) { idxLeg1_mNuNu_ = idx; }
-  void setIdxLeg2_X(int idx) { idxLeg2_X_ = idx; }
+  void setIdxLeg2_t(int idx) { idxLeg2_t_ = idx; }
   void setIdxLeg2_phi(int idx) { idxLeg2_phi_ = idx; }
   void setIdxLeg2VisPtShift(int idx) { idxLeg2VisPtShift_ = idx; }
   void setIdxLeg2_mNuNu(int idx) { idxLeg2_mNuNu_ = idx; }
@@ -55,10 +55,15 @@ class HttXsectionIntegrandWithTauDecays
   enum { kMadgraph, kLiterature };
 
  protected:
+  double compProb(const double*, const svFitMEM::LorentzVector&, double, const svFitMEM::LorentzVector&, double, double) const;
+
   /// measured tau leptons
   bool leg1isLep_;
   double leg1Mass_;
   double leg1Mass2_;
+  mutable svFitMEM::Vector eZ1_;
+  mutable svFitMEM::Vector eY1_;
+  mutable svFitMEM::Vector eX1_; 
   mutable double leg1eX_x_;
   mutable double leg1eX_y_;
   mutable double leg1eX_z_;
@@ -71,6 +76,9 @@ class HttXsectionIntegrandWithTauDecays
   bool leg2isLep_;
   double leg2Mass_;
   double leg2Mass2_;
+  mutable svFitMEM::Vector eZ2_;
+  mutable svFitMEM::Vector eY2_;
+  mutable svFitMEM::Vector eX2_; 
   mutable double leg2eX_x_;
   mutable double leg2eX_y_;
   mutable double leg2eX_z_;
@@ -88,6 +96,8 @@ class HttXsectionIntegrandWithTauDecays
   double mH_;
   double mH2_;
   mutable double GammaH_;
+  mutable double q2_;
+  mutable double GammaH_times_mH_;
   
   double sqrtS_;
   double s_;
@@ -106,11 +116,11 @@ class HttXsectionIntegrandWithTauDecays
   const TH1* leg1lutVisPtRes_;
   const TH1* leg2lutVisPtRes_;
   
-  int idxLeg1_t_;
+  int idxLeg1_X_;
   int idxLeg1_phi_;
   int idxLeg1VisPtShift_;
   int idxLeg1_mNuNu_;
-  int idxLeg2_X_;
+  int idxLeg2_t_;
   int idxLeg2_phi_;
   int idxLeg2VisPtShift_;
   int idxLeg2_mNuNu_;

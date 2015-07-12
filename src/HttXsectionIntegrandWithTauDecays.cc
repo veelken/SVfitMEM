@@ -21,10 +21,11 @@ bool HttXsectionIntegrandWithTauDecays::pdfIsInitialized_ = false;
 
 HttXsectionIntegrandWithTauDecays::HttXsectionIntegrandWithTauDecays(double sqrtS, double mH, const std::string& pdfFileName, int mode, const std::string& madgraphFileName, int verbosity) 
   : mode_(mode),
-    applyMEtTF_(true),
+    applyMEtTF_(true),    
     mH_(mH),
     mH2_(mH*mH),
     GammaH_(1.e-2*mH_),
+    GammaH_times_mH_(GammaH_*mH_),
     sqrtS_(sqrtS),
     s_(square(sqrtS_)),
     invSqrtS_(1./sqrtS_),
@@ -33,11 +34,11 @@ HttXsectionIntegrandWithTauDecays::HttXsectionIntegrandWithTauDecays(double sqrt
     shiftVisPt_(false),
     leg1lutVisPtRes_(0),
     leg2lutVisPtRes_(0),
-    idxLeg1_t_(-1),
+    idxLeg1_X_(-1),
     idxLeg1_phi_(-1),
     idxLeg1VisPtShift_(-1),
     idxLeg1_mNuNu_(-1),
-    idxLeg2_X_(-1),
+    idxLeg2_t_(-1),
     idxLeg2_phi_(-1),
     idxLeg2VisPtShift_(-1),
     idxLeg2_mNuNu_(-1),
@@ -160,6 +161,14 @@ HttXsectionIntegrandWithTauDecays::setInputs(int tau1Type, double vis1Mass, int 
 
 namespace
 {
+  double compDgDp2z(double vis1Pt2, double vis1Pz, double vis2Pz)
+  {
+    double vis1Pz2 = square(vis1Pz);
+    double vis2Pz2 = square(vis2Pz);
+    if ( vis2Pz == 0. ) return 0.;
+    else return -2.*vis1Pz + 2.*TMath::Sqrt((vis1Pt2 + vis1Pz2)/(vis1Pt2 + vis2Pz2))*vis2Pz;
+  }
+
   double extractProbFromLUT(double x, const TH1* lut)
   {    
     //std::cout << "<extractProbFromLUT>:" << std::endl;
@@ -171,33 +180,34 @@ namespace
     return lut->GetBinContent(bin);
   }
 
-  double compCosThetaNu(double visEn, double visP, double visMass2, double nuEn, double nuP, double nuMass2)
+  double compCosThetaNuNu(double visEn, double visP, double visMass2, double nunuEn, double nunuP, double nunuMass2)
   {
-    double cosThetaNu = (visEn*nuEn - 0.5*(tauLeptonMass2 - (visMass2 + nuMass2)))/(visP*nuP);
-    return cosThetaNu;
+    double cosThetaNuNu = (visEn*nunuEn - 0.5*(tauLeptonMass2 - (visMass2 + nunuMass2)))/(visP*nunuP);
+    return cosThetaNuNu;
   }
 
-  double compPSfactor_tauToLepDecay(double x, double visEn, double visP, double visMass, double nuEn, double nuP, double nuMass)
+  double compPSfactor_tauToLepDecay(double x, double visEn, double visP, double visMass, double nunuEn, double nunuP, double nunuMass)
   {
     //std::cout << "<compPSfactor_tauToLepDecay>:" << std::endl;
     //std::cout << " x = " << x << std::endl;
     //std::cout << " visEn = " << visEn << std::endl;
     //std::cout << " visP = " << visP << std::endl;
     //std::cout << " visMass = " << visMass << std::endl;
-    //std::cout << " nuEn = " << nuEn << std::endl;
-    //std::cout << " nuP = " << nuP << std::endl;
-    //std::cout << " nuMass = " << nuMass << std::endl;
-    if ( x >= 0. && x <= 1. && nuMass < TMath::Sqrt((1. - x)*tauLeptonMass2) ) { // physical solution
+    //std::cout << " nunuEn = " << nunuEn << std::endl;
+    //std::cout << " nunuP = " << nunuP << std::endl;
+    //std::cout << " nunuMass = " << nunuMass << std::endl;
+    if ( x >= 0. && x <= 1. && nunuMass < TMath::Sqrt((1. - x)*tauLeptonMass2) ) { // physical solution
       const double GFfactor = square(GF)/(2.*square(TMath::Pi()));
-      double nuMass2 = square(nuMass);
+      double nunuMass2 = square(nunuMass);
       double visMass2 = square(visMass);
-      double tauEn_rf = (tauLeptonMass2 + nuMass2 - visMass2)/(2.*nuMass);
-      double visEn_rf = tauEn_rf - nuMass;
-      double I = GFfactor*nuMass2*(2.*tauEn_rf*visEn_rf - (2./3.)*TMath::Sqrt((square(tauEn_rf) - tauLeptonMass2)*(square(visEn_rf) - visMass2)));
-      double cosThetaNu = compCosThetaNu(visEn, visP, visMass2, nuEn, nuP, nuMass2);
-      //std::cout << "cosThetaNu = " << cosThetaNu << std::endl;
-      if ( !(cosThetaNu >= -1. && cosThetaNu <= +1.) ) return 0.;
-      double PSfactor = (visEn + nuEn)*I/(8.*visP*square(x)*TMath::Sqrt(square(visP) + square(nuP) + 2.*visP*nuP*cosThetaNu + tauLeptonMass2));
+      double tauEn_rf = (tauLeptonMass2 + nunuMass2 - visMass2)/(2.*nunuMass);
+      double visEn_rf = tauEn_rf - nunuMass;
+      if ( !(tauEn_rf > 0. && visEn_rf > 0.) ) return 0.;
+      double I = GFfactor*nunuMass2*(2.*tauEn_rf*visEn_rf - (2./3.)*TMath::Sqrt((square(tauEn_rf) - tauLeptonMass2)*(square(visEn_rf) - visMass2)));
+      double cosThetaNuNu = compCosThetaNuNu(visEn, visP, visMass2, nunuEn, nunuP, nunuMass2);
+      //std::cout << "cosThetaNuNu = " << cosThetaNuNu << std::endl;
+      if ( !(cosThetaNuNu >= -1. && cosThetaNuNu <= +1.) ) return 0.;
+      double PSfactor = (visEn + nunuEn)*I/(8.*visP*square(x)*TMath::Sqrt(square(visP) + square(nunuP) + 2.*visP*nunuP*cosThetaNuNu + tauLeptonMass2));
       return PSfactor;
     } else {
       return 0.;
@@ -215,7 +225,7 @@ namespace
     //std::cout << " nuP = " << nuP << std::endl;
     double visMass2 = square(visMass);
     if ( x >= (visMass2/tauLeptonMass2) && x <= 1. ) { // physical solution
-      double cosThetaNu = compCosThetaNu(visEn, visP, visMass2, nuEn, nuP, 0.);
+      double cosThetaNu = compCosThetaNuNu(visEn, visP, visMass2, nuEn, nuP, 0.);
       //std::cout << "cosThetaNu = " << cosThetaNu << std::endl;
       if ( !(cosThetaNu >= -1. && cosThetaNu <= +1.) ) return 0.;
       double PSfactor = (visEn + nuEn)/(8.*visP*square(x)*TMath::Sqrt(square(visP) + square(nuP) + 2.*visP*nuP*cosThetaNu + tauLeptonMass2));
@@ -224,6 +234,10 @@ namespace
       //     chosen such that the branching fraction of the tau to decay into hadrons is reproduced      
       const double M2 = 16.*TMath::Pi()*cube(tauLeptonMass)*GammaTauToHad/(tauLeptonMass2 - visMass2);
       PSfactor *= M2;
+      //-------------------------------------------------------------------------
+      //-------------------------------------------------------------------------
+      // CV: fudge factor to reproduce literature value for cross-section times branching fraction
+      PSfactor *= 0.5;
       //-------------------------------------------------------------------------
       return PSfactor;
     } else {
@@ -255,99 +269,110 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   //std::cout << "visPtShift1 = " << visPtShift1 << ", visPtShift2 = " << visPtShift2 << std::endl;
 
   // compute four-vector of visible decay products for first tau
-  //-----------------------------------------------------------------------------
-  // CV: build vis1P4 for the case that integral over momenta of visible tau decay products
-  //     is computed using Cartesian coordinates
-  double vis1Px    = visPtShift1*x[0];
-  double vis1Py    = visPtShift1*x[1];
-  double vis1Pz    = visPtShift1*x[2];
-  double vis1En    = TMath::Sqrt(square(vis1Px) + square(vis1Py) + square(vis1Pz) + leg1Mass2_);
+  double vis1Px = visPtShift1*x[0];
+  double vis1Py = visPtShift1*x[1];
+  double vis1Pz = visPtShift1*x[2];
+  double vis1En = TMath::Sqrt(square(vis1Px) + square(vis1Py) + square(vis1Pz) + leg1Mass2_);
   LorentzVector vis1P4(vis1Px, vis1Py, vis1Pz, vis1En);
-  double vis1P     = vis1P4.P();
+  double vis1P = vis1P4.P();
   double vis1Theta = vis1P4.theta();
-  double vis1Phi   = vis1P4.phi();
-  //-----------------------------------------------------------------------------
-  //-----------------------------------------------------------------------------
-  // CV: build vis1P4 for the case that integral over momenta of visible tau decay products
-  //     is computed using polar coordinates
-  //double vis1P     = visPtShift1*x[0];
-  //double vis1Theta = x[1];
-  //double vis1Phi   = x[2];
-  //double vis1Px    = vis1P*TMath::Cos(vis1Phi)*TMath::Sin(vis1Theta);
-  //double vis1Py    = vis1P*TMath::Sin(vis1Phi)*TMath::Sin(vis1Theta);
-  //double vis1Pz    = vis1P*TMath::Cos(vis1Theta);
-  //double vis1En    = TMath::Sqrt(square(vis1Px) + square(vis1Py) + square(vis1Pz) + leg1Mass2_);
-  //LorentzVector vis1P4(vis1Px, vis1Py, vis1Pz, vis1En);
-  //-----------------------------------------------------------------------------
-  Vector eZ1 = Vector(TMath::Cos(vis1Phi)*TMath::Sin(vis1Theta), TMath::Sin(vis1Phi)*TMath::Sin(vis1Theta), TMath::Cos(vis1Theta));
-  Vector eY1 = normalize(compCrossProduct(eZ1, beamAxis_));
-  Vector eX1 = normalize(compCrossProduct(eY1, eZ1));
-  leg1eX_x_ = eX1.x();
-  leg1eX_y_ = eX1.y();
-  leg1eX_z_ = eX1.z();
-  leg1eY_x_ = eY1.x();
-  leg1eY_y_ = eY1.y();
-  leg1eY_z_ = eY1.z();
-  leg1eZ_x_ = eZ1.x();
-  leg1eZ_y_ = eZ1.y();
-  leg1eZ_z_ = eZ1.z();
+  double vis1Phi = vis1P4.phi();
+  eZ1_ = Vector(TMath::Cos(vis1Phi)*TMath::Sin(vis1Theta), TMath::Sin(vis1Phi)*TMath::Sin(vis1Theta), TMath::Cos(vis1Theta));
+  eY1_ = normalize(compCrossProduct(eZ1_, beamAxis_));
+  eX1_ = normalize(compCrossProduct(eY1_, eZ1_));
+  leg1eX_x_ = eX1_.x();
+  leg1eX_y_ = eX1_.y();
+  leg1eX_z_ = eX1_.z();
+  leg1eY_x_ = eY1_.x();
+  leg1eY_y_ = eY1_.y();
+  leg1eY_z_ = eY1_.z();
+  leg1eZ_x_ = eZ1_.x();
+  leg1eZ_y_ = eZ1_.y();
+  leg1eZ_z_ = eZ1_.z();
 
   // compute four-vector of visible decay products for second tau
-  //-----------------------------------------------------------------------------
-  // CV: build vis2P4 for the case that integral over momenta of visible tau decay products
-  //     is computed using Cartesian coordinates
-  //double vis2Px    = visPtShift2*x[3];
-  //double vis2Py    = visPtShift2*x[4];
-  //double vis2Pz    = visPtShift2*x[5];
-  //double vis2En    = TMath::Sqrt(square(vis2Px) + square(vis2Py) + square(vis2Pz) + leg2Mass2_);
-  //LorentzVector vis2P4(vis2Px, vis2Py, vis2Pz, vis2En);
-  //double vis2P     = vis2P4.P();
-  //double vis2Theta = vis2P4.theta();
-  //double vis2Phi   = vis2P4.phi();
-  //Vector eZ2 = Vector(TMath::Cos(vis2Phi)*TMath::Sin(vis2Theta), TMath::Sin(vis2Phi)*TMath::Sin(vis2Theta), TMath::Cos(vis2Theta));
-  //Vector eY2 = normalize(compCrossProduct(eZ2, beamAxis_));
-  //Vector eX2 = normalize(compCrossProduct(eY2, eZ2));
-  //double mVis = (vis1P4 + vis2P4).mass();
-  //double mVis2 = square(mVis);
-  //-----------------------------------------------------------------------------
-  //-----------------------------------------------------------------------------
-  // CV: build vis2P4 for the case that integral over momenta of visible tau decay products
-  //     is computed using polar coordinates
-  double mVis2     = x[3];
-  double mVis      = TMath::Sqrt(mVis2);
-  double vis2Theta = x[4];
-  double vis2Phi   = x[5];
-  Vector eZ2 = Vector(TMath::Cos(vis2Phi)*TMath::Sin(vis2Theta), TMath::Sin(vis2Phi)*TMath::Sin(vis2Theta), TMath::Cos(vis2Theta));
-  Vector eY2 = normalize(compCrossProduct(eZ2, beamAxis_));
-  Vector eX2 = normalize(compCrossProduct(eY2, eZ2));
-  double vis2P     = mVis2/(2.*vis1P*TMath::Max(1.e-2, 1. - compScalarProduct(eZ1, eZ2)));
-  double vis2Px    = vis2P*TMath::Cos(vis2Phi)*TMath::Sin(vis2Theta);
-  double vis2Py    = vis2P*TMath::Sin(vis2Phi)*TMath::Sin(vis2Theta);
-  double vis2Pz    = vis2P*TMath::Cos(vis2Theta);
-  double vis2En    = TMath::Sqrt(square(vis2Px) + square(vis2Py) + square(vis2Pz) + leg2Mass2_);
-  LorentzVector vis2P4(vis2Px, vis2Py, vis2Pz, vis2En);
-  //-----------------------------------------------------------------------------
-  leg2eX_x_ = eX2.x();
-  leg2eX_y_ = eX2.y();
-  leg2eX_z_ = eX2.z();
-  leg2eY_x_ = eY2.x();
-  leg2eY_y_ = eY2.y();
-  leg2eY_z_ = eY2.z();
-  leg2eZ_x_ = eZ2.x();
-  leg2eZ_y_ = eZ2.y();
-  leg2eZ_z_ = eZ2.z();
-
-  assert(idxLeg2_X_ != -1);
-  double x2 = x[idxLeg2_X_];
-  if ( !(x2 >= 1.e-5 && x2 <= 1.) ) return 0.;
-  
-  double GammaH_times_mH = GammaH_*mH_;
-  assert(idxLeg1_t_ != -1);  
-  double tk = x[idxLeg1_t_];
-  double q2 = mH2_ + GammaH_times_mH*TMath::Tan(tk);
-  if ( q2 <= 0. ) return 0.;
-  double x1 = mVis2/(q2*x2);
+  assert(idxLeg1_X_ != -1);
+  double x1 = x[idxLeg1_X_];
   if ( !(x1 >= 1.e-5 && x1 <= 1.) ) return 0.;
+  
+  assert(idxLeg2_t_ != -1);  
+  double tk = x[idxLeg2_t_];
+  q2_ = mH2_ + GammaH_times_mH_*TMath::Tan(tk);
+  if ( q2_ <= 0. ) return 0.;
+
+  double mVis2 = x[3];
+  if ( mVis2 < 1.e-3*mH2_ ) return 0.;
+  double x2 = mVis2/(q2_*x1);
+  if ( !(x2 >= 1.e-5 && x2 <= 1.) ) return 0.;
+
+  double vis2Px = -x2*vis1Px/x1;
+  double vis2Py = -x2*vis1Py/x1;
+  double vis1Pt2 = square(vis1P4.pt());
+  double term1 = mVis2 - 2.*vis1Pt2;
+  double term22 = mVis2*(mVis2 - 4.*vis1Pt2);
+  if ( term22 <= 0. || vis1Pt2 <= 0. ) return 0.;
+  double term2 = TMath::Sqrt(term22);
+  double vis2Pz_p = (vis1Pz*term1 + vis1P*term2)/(2.*vis1Pt2);
+  double vis2En_p = TMath::Sqrt(square(vis2Px) + square(vis2Py) + square(vis2Pz_p) + leg2Mass2_);
+  LorentzVector vis2P4_p(vis2Px, vis2Py, vis2Pz_p, vis2En_p);
+  double absDgDp2z_p = TMath::Abs(compDgDp2z(vis1Pt2, vis1Pz, vis2Pz_p));
+  double vis2Pz_m = (vis1Pz*term1 - vis1P*term2)/(2.*vis1Pt2);
+  double vis2En_m = TMath::Sqrt(square(vis2Px) + square(vis2Py) + square(vis2Pz_m) + leg2Mass2_);
+  LorentzVector vis2P4_m(vis2Px, vis2Py, vis2Pz_m, vis2En_m);
+  double absDgDp2z_m = TMath::Abs(compDgDp2z(vis1Pt2, vis1Pz, vis2Pz_m));
+  double prob = 0.;
+  if ( TMath::Abs(vis2Pz_p) <= sqrtS_ && absDgDp2z_p != 0. ) { 
+    double prob_p = compProb(x, vis1P4, x1, vis2P4_p, x2, absDgDp2z_p);
+    if ( verbosity_ >= 3 ) {
+      std::cout << "solution+: vis2Pz = " << vis2Pz_p << ", prob = " << prob_p << std::endl;
+    }
+    prob += prob_p;
+  }
+  if ( TMath::Abs(vis2Pz_m) <= sqrtS_ && absDgDp2z_m != 0. ) { 
+    double prob_m = compProb(x, vis1P4, x1, vis2P4_m, x2, absDgDp2z_m);
+    if ( verbosity_ >= 3 ) {
+      std::cout << "solution-: vis2Pz = " << vis2Pz_m << ", prob = " << prob_m << std::endl;
+    }
+    prob += prob_m;
+  }
+
+  //double vis2Px = -vis1Px; // CV: this is only approximate, assuming that pT balance is between visible tau decay products and not between taus
+  //double vis2Py = -vis1Py;
+  //double vis2Pz = x[3];
+  //double vis2En = TMath::Sqrt(square(vis2Px) + square(vis2Py) + square(vis2Pz) + leg2Mass2_);
+  //LorentzVector vis2P4(vis2Px, vis2Py, vis2Pz, vis2En);
+  //
+  //double mVis2 = (vis1P4 + vis2P4).mass();
+  //double x2 = mVis2/(q2_*x1);
+  //if ( !(x2 >= 1.e-5 && x2 <= 1.) ) return 0.;
+  //
+  //double prob = compProb(x, vis1P4, x1, vis2P4, x2, 1.);
+
+  return prob;
+}
+
+double
+HttXsectionIntegrandWithTauDecays::compProb(const double* x, const LorentzVector& vis1P4, double x1, const LorentzVector& vis2P4, double x2, double absDgDp2z) const
+{
+  double vis1En = vis1P4.E();
+  double vis1P = vis1P4.P();
+
+  double vis2En = vis2P4.E();
+  double vis2P = vis2P4.P();
+  double vis2Theta = vis2P4.theta();
+  double vis2Phi = vis2P4.phi();
+  eZ2_ = Vector(TMath::Cos(vis2Phi)*TMath::Sin(vis2Theta), TMath::Sin(vis2Phi)*TMath::Sin(vis2Theta), TMath::Cos(vis2Theta));
+  eY2_ = normalize(compCrossProduct(eZ2_, beamAxis_));
+  eX2_ = normalize(compCrossProduct(eY2_, eZ2_));
+  leg2eX_x_ = eX2_.x();
+  leg2eX_y_ = eX2_.y();
+  leg2eX_z_ = eX2_.z();
+  leg2eY_x_ = eY2_.x();
+  leg2eY_y_ = eY2_.y();
+  leg2eY_z_ = eY2_.z();
+  leg2eZ_x_ = eZ2_.x();
+  leg2eZ_y_ = eZ2_.y();
+  leg2eZ_z_ = eZ2_.z();
 
   // compute neutrino and tau lepton four-vector for first tau
   double nu1En    = vis1En*(1. - x1)/x1;
@@ -355,7 +380,7 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   double nu1P     = TMath::Sqrt(TMath::Max(0., nu1En*nu1En - square(nu1Mass)));
   assert(idxLeg1_phi_ != -1);  
   double phiNu1 = x[idxLeg1_phi_];
-  double cosThetaNu1 = compCosThetaNu(vis1En, vis1P, leg1Mass2_, nu1En, nu1P, square(nu1Mass));
+  double cosThetaNu1 = compCosThetaNuNu(vis1En, vis1P, leg1Mass2_, nu1En, nu1P, square(nu1Mass));
   if ( !(cosThetaNu1 >= -1. && cosThetaNu1 <= +1.) ) return 0.;
   double thetaNu1 = TMath::ACos(cosThetaNu1);
   double nu1Px_local = nu1P*TMath::Cos(phiNu1)*TMath::Sin(thetaNu1);
@@ -367,9 +392,9 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   LorentzVector nu1P4(nu1Px, nu1Py, nu1Pz, nu1En);
 
   double tau1En = vis1En + nu1En;
-  double tau1Px = vis1Px + nu1Px;
-  double tau1Py = vis1Py + nu1Py;
-  double tau1Pz = vis1Pz + nu1Pz;
+  double tau1Px = vis1P4.px() + nu1Px;
+  double tau1Py = vis1P4.py() + nu1Py;
+  double tau1Pz = vis1P4.pz() + nu1Pz;
   LorentzVector tau1P4(tau1Px, tau1Py, tau1Pz, tau1En);
 
   // compute neutrino and tau lepton four-vector for second tau
@@ -378,7 +403,7 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   double nu2P     = TMath::Sqrt(TMath::Max(0., nu2En*nu2En - square(nu2Mass)));
   assert(idxLeg2_phi_ != -2);  
   double phiNu2 = x[idxLeg2_phi_];
-  double cosThetaNu2 = compCosThetaNu(vis2En, vis2P, leg2Mass2_, nu2En, nu2P, square(nu2Mass));
+  double cosThetaNu2 = compCosThetaNuNu(vis2En, vis2P, leg2Mass2_, nu2En, nu2P, square(nu2Mass));
   if ( !(cosThetaNu2 >= -1. && cosThetaNu2 <= +1.) ) return 0.;
   double thetaNu2 = TMath::ACos(cosThetaNu2);
   double nu2Px_local = nu2P*TMath::Cos(phiNu2)*TMath::Sin(thetaNu2);
@@ -390,9 +415,9 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   LorentzVector nu2P4(nu2Px, nu2Py, nu2Pz, nu2En);
 
   double tau2En = vis2En + nu2En;
-  double tau2Px = vis2Px + nu2Px;
-  double tau2Py = vis2Py + nu2Py;
-  double tau2Pz = vis2Pz + nu2Pz;
+  double tau2Px = vis2P4.px() + nu2Px;
+  double tau2Py = vis2P4.py() + nu2Py;
+  double tau2Pz = vis2P4.pz() + nu2Pz;
   LorentzVector tau2P4(tau2Px, tau2Py, tau2Pz, tau2En);
 
   double prob_TF = 1.;
@@ -513,33 +538,8 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   }
   assert(prob_ME >= 0.);
   
-  // CV: The LO cross-section assumes that the Higgs has zero zero transverse momentum,
-  //     corresponding to a delta-function 
-  //      delta(tau1Px - tau2Px) * delta(tau1Px - tau2Px) 
-  //    = delta(visPtShift1*vis1Px/x1 - visPtShift2*vis2Px/x2) * delta(visPtShift1*vis1Py/x1 - visPtShift2*vis2Py/x2)
-  //    = (x2/visPtShift2)^2 * delta(visPtShift1*vis1Px*x2/(x1*visPtShift2) - vis2Px) * delta(visPtShift1*vis1Py*x2/(x1*visPtShift2) - vis2Py)
-  //     where the delta-function rule: delta(alpha x) = 1/|alpha| * delta(x) has been used, cf. https://en.wikipedia.org/wiki/Dirac_delta_function 
-  //
-  //     Instead of including the delta-functions into the numeric integration,
-  //     we correct the integral by the following means:
-  //      1) in HttXsectionIntegrandWithTauDecays::Eval we multiply the integrand by the factor (x2/visPtShift2)^2
-  //      2) in HttXsectionWithTauDecays::integrate we multiply the value of the integral by a factor 1/((xu_vis2Px - xl_vis2Px)*(xu_vis2Py - xl_vis2Py))
-  //
-  //     Note that as we boost all four-vectors into the MEM frame, the integrand is constant for all values of vis2Px and vis2Py
-  //
-  //-----------------------------------------------------------------------------
-  // CV: factor for the case that integral over momenta of visible tau decay products
-  //     is computed using Cartesian coordinates
-  double memFrameFactor = ( visPtShift1 > 0. ) ? square(x1/visPtShift1) : 0.;
-  //-----------------------------------------------------------------------------
-  //-----------------------------------------------------------------------------
-  // CV: factor for the case that integral over momenta of visible tau decay products
-  //     is computed using Cartesian coordinates
-  //double memFrameFactor = square(2.*vis1P*TMath::Max(1.e-2, 1. - compScalarProduct(eZ1, eZ2))*x2)/(TMath::Cos(vis2Phi)*TMath::Sin(vis2Theta)*TMath::Sin(vis2Phi)*TMath::Sin(vis2Theta));
-  //-----------------------------------------------------------------------------
-
   const double conversionFactor = 1.e+10*square(hbar_c); // conversion factor from GeV^-2 to picobarn = 10^-40m
-  const double constFactor = 2.*conversionFactor/sixth(2.*TMath::Pi());
+  const double constFactor = 2.*conversionFactor/eigth(2.*TMath::Pi());
   double prob_PS_and_tauDecay = constFactor/s_;
   LorentzVector vis1P4_mem = ROOT::Math::VectorUtil::boost(vis1P4, boost); 
   LorentzVector nu1P4_mem  = ROOT::Math::VectorUtil::boost(nu1P4, boost); 
@@ -566,21 +566,13 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   // CV: multiply matrix element by factor (Pi/(mTau GammaTau))^2 from Luca's write-up
   prob_PS_and_tauDecay *= square(TMath::Pi()/(tauLeptonMass*GammaTau));
 
+  double jacobiFactor = 1./absDgDp2z;
   double mVis_mem = (vis1P4_mem + vis2P4_mem).mass();
-  double jacobiFactor = (square(mVis_mem)/(square(q2)*x2_mem))*(square(q2 - mH2_) + square(GammaH_times_mH))/GammaH_times_mH;
-  //-----------------------------------------------------------------------------
-  // CV: extra Jacobi factors if integrating over momenta of visible tau decay products
-  //     using polar coordinates
-  //jacobiFactor *= square(vis1P)*TMath::Sin(vis1Theta);
-  jacobiFactor *= square(vis2P)*TMath::Sin(vis2Theta);
-  jacobiFactor *= (1./(2.*vis1P*TMath::Max(1.e-2, 1. - compScalarProduct(eZ1, eZ2))));
-  //-----------------------------------------------------------------------------
-  //if ( idxLeg1VisPtShift_ != -1 && !leg1isLep_ ) jacobiFactor *= vis1P4.pt();
-  //if ( idxLeg2VisPtShift_ != -1 && !leg2isLep_ ) jacobiFactor *= vis2P4.pt();
+  jacobiFactor *= (square(mVis_mem)/(square(q2_)*x1_mem))*(square(q2_ - mH2_) + square(GammaH_times_mH_))/GammaH_times_mH_;
 
-  double prob = prob_flux*prob_PDF*prob_ME*memFrameFactor*prob_PS_and_tauDecay*prob_TF*prob_acceptance*jacobiFactor;
+  double prob = prob_flux*prob_PDF*prob_ME*prob_PS_and_tauDecay*prob_TF*prob_acceptance*jacobiFactor;
   if ( verbosity_ >= 2 ) {
-    std::cout << "prob: flux = " << prob_flux << ", PDF = " << prob_PDF << ", ME = " << prob_ME << ", MEM-frame = " << memFrameFactor << ", PS+decay = " << prob_PS_and_tauDecay << "," 
+    std::cout << "prob: flux = " << prob_flux << ", PDF = " << prob_PDF << ", ME = " << prob_ME << ", PS+decay = " << prob_PS_and_tauDecay << "," 
 	      << " TF = " << prob_TF << ", acceptance = " << prob_acceptance << ", Jacobi = " << jacobiFactor << " --> returning " << prob << std::endl;
   }
 
@@ -595,9 +587,9 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   }
   isFirstCall_ = false;
   //if ( prob < 0. || prob > 1.e+6 ) {
-  //  std::cout << "CHECK prob: flux = " << prob_flux << ", PDF = " << prob_PDF << ", ME = " << prob_ME << ", MEM-frame = " << memFrameFactor << ", PS+decay = " << prob_PS_and_tauDecay << "," 
+  //  std::cout << "CHECK prob: flux = " << prob_flux << ", PDF = " << prob_PDF << ", ME = " << prob_ME << ", PS+decay = " << prob_PS_and_tauDecay << "," 
   //	        << " TF = " << prob_TF << ", acceptance = " << prob_acceptance << ", Jacobi = " << jacobiFactor << " --> returning " << prob << std::endl;
-  //  std::cout << "xa = " << xa << ", xb = " << xb << ": q2 = " << q2 << std::endl;
+  //  std::cout << "xa = " << xa << ", xb = " << xb << ": q2 = " << q2_ << std::endl;
   //  std::cout << "vis1: Pt = " << vis1P4.pt() << ", eta = " << vis1P4.eta() << ", phi = " << vis1P4.phi() << ", mass = " << vis1P4.mass() << std::endl;
   //  std::cout << "vis2: Pt = " << vis2P4.pt() << ", eta = " << vis2P4.eta() << ", phi = " << vis2P4.phi() << ", mass = " << vis2P4.mass() << std::endl;
   //  std::cout << "visPtShift: leg1 = " << visPtShift1 << ", leg2 = " << visPtShift2 << std::endl;

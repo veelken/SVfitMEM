@@ -3,9 +3,7 @@
 
 #include "TauAnalysis/SVfitMEM/interface/HttXsectionIntegrandWithTauDecays.h"
 #include "TauAnalysis/SVfitMEM/interface/svFitAuxFunctions.h"
-
-#include <gsl/gsl_monte.h>
-#include <gsl/gsl_monte_vegas.h>
+#include "TauAnalysis/SVfitMEM/interface/SVfitIntegratorBase.h"
 
 #include <TBenchmark.h>
 #include <TFile.h>
@@ -24,21 +22,22 @@ class HttXsectionWithTauDecays
   /// take resolution on energy of hadronic tau decays into account
   void shiftVisPt(bool value, TFile* inputFile);
 
-  /// number of function calls for VEGAS integration (default is 10000)
-  void setMaxObjFunctionCalls(unsigned value) 
+  /// number of function calls for Markov Chain and VEGAS integration (default is 100000)
+  void setMaxObjFunctionCalls(unsigned maxObjFunctionCalls) 
   { 
-    numCallsGridOpt_ = TMath::Nint(0.20*value);
-    numCallsIntEval_ = TMath::Nint(0.80*value);
+    maxObjFunctionCalls_ = maxObjFunctionCalls;
   }
 
   /// enable/disable acceptance cuts
   void enableAcceptanceCuts(double (*acceptance)(const svFitMEM::LorentzVector&, const svFitMEM::LorentzVector&, double, double))
   {
-    integrand_->enableAcceptanceCuts(acceptance); 
+    integrand_->enableAcceptanceCuts(acceptance);
+    applyAcceptanceCuts_ = true;
   }
   void disableAcceptanceCuts()
   {
     integrand_->disableAcceptanceCuts(); 
+    applyAcceptanceCuts_ = false;
   }
     
   /// run integration 
@@ -52,40 +51,26 @@ class HttXsectionWithTauDecays
  protected:
 
   bool applyMEtTF_;
+  bool applyAcceptanceCuts_;
 
   HttXsectionIntegrandWithTauDecays* integrand_;
   double sqrtS_;
   double mH_;
   double mH2_;
 
-  /// auxiliary variables for VEGAS integration
-  gsl_monte_function* vegasIntegrand_;
-  gsl_monte_vegas_state* vegasWorkspace_;
-  mutable gsl_rng* vegasRnd_;
-  unsigned numCallsGridOpt_;
-  unsigned numCallsIntEval_;
-  double maxChi2_;
-  unsigned maxIntEvalIter_;
-  double precision_;
+  /// interface to integration algorithm (either Markov Chain integration or VEGAS)
+  enum { kMarkovChain, kVEGAS }; 
+  int intMode_;
+  svFitMEM::SVfitIntegratorBase* intAlgo_;
+  unsigned maxObjFunctionCalls_;
+
+  /// dimension of integration region
   unsigned numDimensions_;
 
   /// lower and upper boundary of integration region
   double* xl_;
   double* xu_;
   
-  double xl_vis1P_;
-  double xu_vis1P_;
-  double xl_vis1Px_;
-  double xu_vis1Px_;
-  double xl_vis1Py_;
-  double xu_vis1Py_;
-  double xl_mVis2_;
-  double xu_mVis2_;
-  double xl_vis2Px_;
-  double xu_vis2Px_;
-  double xl_vis2Py_;
-  double xu_vis2Py_;
-
   /// cross-section
   double xSection_;
   /// uncertainty on cross-section

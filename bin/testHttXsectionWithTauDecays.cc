@@ -85,16 +85,16 @@ int main(int argc, char* argv[])
   std::vector<double> mH;
   //mH.push_back(90.);
   mH.push_back(100.);
-  mH.push_back(125.);
-  mH.push_back(150.);
+  //mH.push_back(125.);
+  //mH.push_back(150.);
   //mH.push_back(160.);
-  mH.push_back(200.);
-  mH.push_back(250.);
-  mH.push_back(300.);
-  mH.push_back(350.);
-  mH.push_back(400.);
-  mH.push_back(450.);
-  mH.push_back(500.);
+  //mH.push_back(200.);
+  //mH.push_back(250.);
+  //mH.push_back(300.);
+  //mH.push_back(350.);
+  //mH.push_back(400.);
+  //mH.push_back(450.);
+  //mH.push_back(500.);
 
   // CV: compare cross-sections computed using MadGraph 
   //     with values computed by LHC XS working-group
