@@ -4,7 +4,11 @@
 /**
    \class me_ggH_lit me_ggH_lit.h "TauAnalysis/SVfitStandalone/interface/me_ggH_lit.h"
    \brief Compute leading order gg -> Higgs matrix element. 
-      The formulas are taken from hep-ph/9504378 and from S. Bentvelsen, E. Laenen and P. Motylinski: "Higgs production through gluon fusion at leading order".
+      The formulas are taken from "
+        "Leading order gluon fusion in realistic composite Higgs models with SO(5) symmetry", M. Brucherseifer, masters thesis, ETH.
+      and have been cross-checked with
+        hep-ph/9504378 
+        "Higgs production through gluon fusion at leading order", S. Bentvelsen, E. Laenen and P. Motylinski
 */
 
 #include "TauAnalysis/SVfitMEM/interface/svFitAuxFunctions.h"

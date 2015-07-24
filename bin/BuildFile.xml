@@ -22,6 +22,54 @@
   <use name="rootcintex"/>
   <use name="root"/>
 </bin>
+<bin   file="testHttXsectionWithTauDecays_leplep.cc" name="testHttXsectionWithTauDecays_leplep">
+  <use name="FWCore/ParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
+<bin   file="testHttXsectionWithTauDecays_lephad.cc" name="testHttXsectionWithTauDecays_lephad">
+  <use name="FWCore/ParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
+<bin   file="testHttXsectionWithTauDecays_hadlep.cc" name="testHttXsectionWithTauDecays_hadlep">
+  <use name="FWCore/ParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
+<bin   file="testHttXsectionWithTauDecays_hadhad.cc" name="testHttXsectionWithTauDecays_hadhad">
+  <use name="FWCore/ParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
+<bin   file="testHttXsectionWithTauDecays_pipi.cc" name="testHttXsectionWithTauDecays_pipi">
+  <use name="FWCore/ParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
+<bin   file="testHttXsectionWithTauDecays_pirho.cc" name="testHttXsectionWithTauDecays_pirho">
+  <use name="FWCore/ParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
+<bin   file="testHttXsectionWithTauDecays_rhopi.cc" name="testHttXsectionWithTauDecays_rhopi">
+  <use name="FWCore/ParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
+<bin   file="testHttXsectionWithTauDecays_rhorho.cc" name="testHttXsectionWithTauDecays_rhorho">
+  <use name="FWCore/ParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
 <bin   file="testTFNormalization.cc" name="testTFNormalization">
   <use name="FWCore/ParameterSet"/>
   <use name="TauAnalysis/SVfitMEM"/>

@@ -11,6 +11,7 @@
 
 #include "TFile.h"
 #include "TH1.h"
+#include "TGraphErrors.h"
 #include "TString.h"
 
 using namespace svFitMEM;
@@ -26,6 +27,16 @@ namespace
     }
     return inputFile.fullPath().data();
   }
+
+  const TGraphErrors* readGraphErrors(TFile* inputFile, const std::string& graphName)
+  {
+    TGraphErrors* graph = dynamic_cast<TGraphErrors*>(inputFile->Get(graphName.data()));
+    if ( !graph ) {
+      std::cerr << "<readGraph>: Failed to load graph = " << graphName << " from file = " << inputFile->GetName() << " !!" << std::endl;
+      assert(0);
+    }
+    return (TGraphErrors*)graph->Clone();
+  }
 }
 
 void singleEvent()
@@ -35,8 +46,8 @@ void singleEvent()
   */
 
   // define MET
-  double measuredMETx =  18.24;
-  double measuredMETy = -23.07; 
+  double measuredMETx =  18.24 - 20.00*TMath::Cos(-0.906);
+  double measuredMETy = -23.07 - 20.00*TMath::Sin(-0.906); 
 
   // define MET covariance
   TMatrixD covMET(2,2);
@@ -47,7 +58,8 @@ void singleEvent()
 
   // define visible tau decay products
   std::vector<MeasuredTauLepton> measuredTauLeptons;
-  measuredTauLeptons.push_back(MeasuredTauLepton(MeasuredTauLepton::kTauToMuDecay,  22.76, -0.566, -0.906, muonMass)); // tau -> electron decay (Pt, eta, phi, mass)
+  //measuredTauLeptons.push_back(MeasuredTauLepton(MeasuredTauLepton::kTauToMuDecay,  22.76, -0.566, -0.906, muonMass)); // tau -> muon decay (Pt, eta, phi, mass)
+  measuredTauLeptons.push_back(MeasuredTauLepton(MeasuredTauLepton::kTauToHadDecay, 42.76, -0.566, -0.906, chargedPionMass, 0)); // tau -> hadron decay (Pt, eta, phi, mass, tauDecayMode)
   measuredTauLeptons.push_back(MeasuredTauLepton(MeasuredTauLepton::kTauToHadDecay, 55.05, -1.543,  2.749, 0.712, 1)); // tau -> hadron decay (Pt, eta, phi, mass, tauDecayMode)
   /*
      tauDecayModes:  0 one-prong without neutral pions
@@ -55,20 +67,34 @@ void singleEvent()
 		    10 three-prong without neutral pions
   */
 
-  std::string madgraphFileName = findFile("TauAnalysis/SVfitMEM/data/param_card.dat");
   // CV: set center-of-mass energy to 13 TeV (LHC run 2)
   double sqrtS = 13.e+3; 
+  
+  //int mode = SVfitIntegrand::kMadgraph;
+  int mode = SVfitIntegrand::kLiterature;
+
   // CV: remove ".gz" suffix, as it is internally added by LHAPDF 
   std::string pdfFileName = TString(findFile("TauAnalysis/SVfitMEM/data/cteq65.LHgrid.gz").data()).ReplaceAll(".gz", "").Data();
+
+  std::string madgraphFileName = "TauAnalysis/SVfitMEM/data/param_card.dat";
+
   int verbosity = 1;
-  SVfitMEM svFitAlgo(madgraphFileName, sqrtS, pdfFileName.data(), verbosity);
+  SVfitMEM svFitAlgo(sqrtS, pdfFileName.data(), mode, findFile(madgraphFileName), verbosity);
   //-----------------------------------------------------------------------------
   // CV: enable the following lines to take experimental resolution on hadronic tau energy into account
-  std::string visPtResFileName = findFile("TauAnalysis/SVfitMEM/data/svFitVisMassAndPtResolutionPDF.root");
-  TH1::AddDirectory(false);  
-  TFile* visPtResFile = new TFile(visPtResFileName.data());
-  svFitAlgo.shiftVisPt(true, visPtResFile);
-  delete visPtResFile;
+  //std::string visPtResFileName = findFile("TauAnalysis/SVfitMEM/data/svFitVisMassAndPtResolutionPDF.root");
+  //TH1::AddDirectory(false);  
+  //TFile* visPtResFile = new TFile(visPtResFileName.data());
+  //svFitAlgo.shiftVisPt(true, visPtResFile);
+  //delete visPtResFile;
+  //-----------------------------------------------------------------------------
+  //-----------------------------------------------------------------------------
+  // CV: enable the following lines to take cross-section*signal acceptance/efficiency into account
+  std::string xSection_times_AccFileName = "TauAnalysis/SVfitMEM/data/testHttXsectionWithTauDecays_hadhad.root";
+  TFile* xSection_times_AccFile = new TFile(findFile(xSection_times_AccFileName).data());
+  const TGraphErrors* xSection_times_AccGraph = readGraphErrors(xSection_times_AccFile, "graph_Xsection_wAcc");
+  svFitAlgo.setCrossSection_times_Acc(xSection_times_AccGraph);
+  delete xSection_times_AccFile;
   //-----------------------------------------------------------------------------
   svFitAlgo.setMaxObjFunctionCalls(2000);
   svFitAlgo.integrate(measuredTauLeptons, measuredMETx, measuredMETy, covMET, "testSVfitMEM.root");

@@ -1,5 +1,8 @@
 #include "TauAnalysis/SVfitMEM/interface/SVfitMEM.h"
 
+#include "TauAnalysis/SVfitMEM/interface/SVfitIntegratorMarkovChain.h"
+#include "TauAnalysis/SVfitMEM/interface/SVfitIntegratorVEGAS.h"
+
 #include <TGraphErrors.h>
 #include <TH1.h>
 
@@ -15,27 +18,26 @@ namespace
   }
 }
 
-SVfitMEM::SVfitMEM(const std::string& madgraphFileName, double sqrtS, const std::string& pdfFileName, int verbosity) 
+SVfitMEM::SVfitMEM(double sqrtS, const std::string& pdfFileName, int mode, const std::string& madgraphFileName, int verbosity) 
   : integrand_(0),
     sqrtS_(sqrtS),
-    vegasIntegrand_(0),
-    vegasWorkspace_(0),
-    vegasRnd_(0),
-    numCallsGridOpt_(2000),
-    numCallsIntEval_(8000),
-    maxChi2_(2.),
-    maxIntEvalIter_(5),
+    //intMode_(kMarkovChain),
+    intMode_(kVEGAS),
+    intAlgo_(0),
+    maxObjFunctionCalls_(100000),
     precision_(1.e-5),
     numDimensions_(0),
     xl_(0),
     xu_(0),
+    graph_xSection_times_Acc_(0),
     shiftVisPt_(false),
     lutVisPtResDM0_(0),
     lutVisPtResDM1_(0),
     lutVisPtResDM10_(0),
+    clock_(0),
     verbosity_(verbosity)
 { 
-  integrand_ = new SVfitIntegrand(madgraphFileName, sqrtS_, pdfFileName, verbosity_);
+  integrand_ = new SVfitIntegrand(sqrtS_, pdfFileName, mode, madgraphFileName, verbosity_);
 
   clock_ = new TBenchmark();
 }
@@ -44,11 +46,18 @@ SVfitMEM::~SVfitMEM()
 {
   delete integrand_;
 
+  delete graph_xSection_times_Acc_;
+
   delete lutVisPtResDM0_;
   delete lutVisPtResDM1_;
   delete lutVisPtResDM10_;
 
   delete clock_;
+}
+
+void SVfitMEM::setCrossSection_times_Acc(const TGraphErrors* graph)
+{
+  graph_xSection_times_Acc_ = graph;
 }
 
 namespace
@@ -91,6 +100,54 @@ namespace
       return ( measuredTauLepton1.pt() > measuredTauLepton2.pt() );
     }
   };
+
+  double linearInterpolateY(double mTest, double x0, double x1, double y0, double y1)
+  {
+    double weight0 = (mTest - x0)/(x1 - x0);
+    assert(weight0 >= 0 && weight0 <= 1);
+    double weight1 = (x1 - mTest)/(x1 - x0);
+    assert(weight1 >= 0 && weight1 <= 1);
+    const double epsilon = 1.e-3;
+    assert((weight0 + weight1) > (1 - epsilon) && (weight0 + weight1) < (1 + epsilon));
+    return (weight0*y0 + weight1*y1);
+  }
+
+  double compCrossSection_times_Acc(const TGraphErrors* graph, double mTest, double& xSection_times_AccErr)
+  {
+    int numPoints = graph->GetN();
+    int idxPoint0 = -1;
+    int idxPoint1 = numPoints;
+    for ( int idxPoint = 0; idxPoint < numPoints; ++idxPoint ) {
+      double x, y;
+      graph->GetPoint(idxPoint, x, y);
+      if ( x < mTest && idxPoint > idxPoint0 ) idxPoint0 = idxPoint;
+      if ( x > mTest && idxPoint < idxPoint1 ) idxPoint1 = idxPoint;
+    }
+    double xSection_times_Acc = 0.;
+    if ( idxPoint0 >= 0 && idxPoint1 < numPoints ) {
+      double x0, y0;
+      graph->GetPoint(idxPoint0, x0, y0);
+      double x1, y1;
+      graph->GetPoint(idxPoint1, x1, y1);
+      xSection_times_Acc = linearInterpolateY(mTest, x0, x1, y0, y1);
+      double yErr0 = graph->GetErrorY(idxPoint0);
+      double yErr1 = graph->GetErrorY(idxPoint1);
+      xSection_times_AccErr = linearInterpolateY(mTest, x0, x1, yErr0, yErr1);
+    } else if ( idxPoint0 == -1 ) {
+      double x, y;
+      graph->GetPoint(0, x, y);
+      xSection_times_Acc = y;
+      double yErr = graph->GetErrorY(0);
+      xSection_times_AccErr = yErr;
+    } else if ( idxPoint1 == numPoints ) {
+      double x, y;
+      graph->GetPoint(numPoints - 1, x, y);
+      xSection_times_Acc = y;
+      double yErr = graph->GetErrorY(numPoints - 1);
+      xSection_times_AccErr = yErr;
+    } else assert(0);
+    return xSection_times_Acc;
+  }
 }
 
 void
@@ -137,13 +194,13 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
   covMET_rounded[1][1] = roundToNdigits(covMET[1][1]);
 
 //--- determine dimension of integration space 
-  int idxLeg1_t = -1;
+  int idxLeg1_X = -1;
   int idxLeg1_phi = -1;
   int idxLeg1VisPtShift = -1;
   int idxLeg1_mNuNu = -1;
   const TH1* leg1lutVisPtRes = 0;
 
-  int idxLeg2_X = -1;
+  int idxLeg2_t = -1;
   int idxLeg2_phi = -1;
   int idxLeg2VisPtShift = -1;
   int idxLeg2_mNuNu = -1;
@@ -154,7 +211,7 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
   for ( size_t idx = 0; idx < measuredTauLeptons_.size(); ++idx ) {
     const MeasuredTauLepton& measuredTauLepton = measuredTauLeptons_[idx];
     if ( idx == 0 ) {      
-      idxLeg1_t = numDimensions_;
+      idxLeg1_X = numDimensions_;
       numDimensions_ += 1;
       idxLeg1_phi = numDimensions_;
       numDimensions_ += 1;
@@ -181,7 +238,7 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
       }
     }
     if ( idx == 1 ) {
-      idxLeg2_X = numDimensions_;
+      idxLeg2_t = numDimensions_;
       numDimensions_ += 1;
       idxLeg2_phi = numDimensions_;
       numDimensions_ += 1;
@@ -210,31 +267,48 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
   }
 
   integrand_->setInputs(measuredTauLeptons_rounded, measuredMETx_rounded, measuredMETy_rounded, covMET_rounded);
-  integrand_->shiftVisPt(shiftVisPt_, leg1lutVisPtRes, leg2lutVisPtRes);
-  integrand_->setIdxLeg1_t(idxLeg1_t);
+  //integrand_->shiftVisPt(shiftVisPt_, leg1lutVisPtRes, leg2lutVisPtRes);
+  integrand_->setIdxLeg1_X(idxLeg1_X);
   integrand_->setIdxLeg1_phi(idxLeg1_phi);
   integrand_->setIdxLeg1VisPtShift(idxLeg1VisPtShift);
   integrand_->setIdxLeg1_mNuNu(idxLeg1_mNuNu);
-  integrand_->setIdxLeg2_X(idxLeg2_X);
+  integrand_->setIdxLeg2_t(idxLeg2_t);
   integrand_->setIdxLeg2_phi(idxLeg2_phi);
   integrand_->setIdxLeg2VisPtShift(idxLeg2VisPtShift);
   integrand_->setIdxLeg2_mNuNu(idxLeg2_mNuNu);
   SVfitIntegrand::gSVfitIntegrand = integrand_;
 
-  vegasIntegrand_ = new gsl_monte_function;
-  vegasIntegrand_->f = &g;
-  vegasIntegrand_->dim = numDimensions_;
-  vegasIntegrand_->params = new double[1];
-  vegasWorkspace_ = gsl_monte_vegas_alloc(numDimensions_);
-  gsl_rng_env_setup();
-  vegasRnd_ = gsl_rng_alloc(gsl_rng_default);
-  gsl_rng_set(vegasRnd_, 12345); 
-  
+  if ( intMode_ == kMarkovChain ) {
+    //unsigned numChains = TMath::Nint(maxObjFunctionCalls_/100000.);
+    unsigned numChains = 1;
+    unsigned numIterBurnin = TMath::Nint(0.10*maxObjFunctionCalls_/numChains);
+    unsigned numIterSampling = TMath::Nint(0.90*maxObjFunctionCalls_/numChains);
+    unsigned numIterSimAnnealingPhase1 = TMath::Nint(0.20*numIterBurnin);
+    unsigned numIterSimAnnealingPhase2 = TMath::Nint(0.60*numIterBurnin);
+    std::string treeFileName = "SVfitIntegratorMarkovChain_SVfitMEM.root";
+    intAlgo_ = new SVfitIntegratorMarkovChain(
+      "uniform", 
+      numIterBurnin, numIterSampling, numIterSimAnnealingPhase1, numIterSimAnnealingPhase2,
+      15., 1. - 1./(0.1*numIterBurnin),
+      numChains, 100, 
+      1.e-2, 0.71,
+      treeFileName.data());
+  } else if ( intMode_ == kVEGAS ) {
+    unsigned numCallsGridOpt = TMath::Nint(0.20*maxObjFunctionCalls_);
+    unsigned numCallsIntEval = TMath::Nint(0.80*maxObjFunctionCalls_);
+    intAlgo_ = new SVfitIntegratorVEGAS(
+      numCallsGridOpt, numCallsIntEval, 
+      2., 20.);
+  } else {
+    std::cerr << "<SVfitMEM::integrate>: Invalid Configuration Parameter 'intMode' = " << intMode_ << " --> ABORTING !!\n";
+    assert(0);
+  }
+
   //std::cout << "numDimensions = " << numDimensions_ << std::endl;
   xl_ = new double[numDimensions_];
   xu_ = new double[numDimensions_];
-  xl_[idxLeg1_t] = -0.5*TMath::Pi();
-  xu_[idxLeg1_t] = +0.5*TMath::Pi();
+  xl_[idxLeg1_X] = 0.;
+  xu_[idxLeg1_X] = 1.;
   xl_[idxLeg1_phi] = -TMath::Pi();
   xu_[idxLeg1_phi] = +TMath::Pi();
   if ( idxLeg1VisPtShift != -1 ) {
@@ -245,8 +319,8 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
     xl_[idxLeg1_mNuNu] = 0.;
     xu_[idxLeg1_mNuNu] = tauLeptonMass2;
   }
-  xl_[idxLeg2_X] = 0.;
-  xu_[idxLeg2_X] = 1.;
+  xl_[idxLeg2_t] = -0.5*TMath::Pi();
+  xu_[idxLeg2_t] = +0.5*TMath::Pi();
   xl_[idxLeg2_phi] = -TMath::Pi();
   xu_[idxLeg2_phi] = +TMath::Pi();
   if ( idxLeg2VisPtShift != -1 ) {
@@ -283,28 +357,22 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
   while ( mTest < sqrtS_ && !skipHighMassTail ) {
     integrand_->setMtest(mTest);
     
-    p = 0.;
-    pErr = 0.;
-
-    gsl_monte_vegas_init(vegasWorkspace_);
-    vegasWorkspace_->stage = 0;
-    gsl_monte_vegas_integrate(vegasIntegrand_, xl_, xu_, numDimensions_, numCallsGridOpt_/vegasWorkspace_->iterations, vegasRnd_, vegasWorkspace_, &p, &pErr);
-    vegasWorkspace_->stage = 1;
-
-    // CV: repeat integration in case chi2 of estimated integral/uncertainty values
-    //     indicates that result of integration cannot be trusted
-    //    (up to maxIntEvalIter times in total)
-    unsigned iteration = 0;
-    double chi2 = -1.;
-    do {
-      gsl_monte_vegas_integrate(vegasIntegrand_, xl_, xu_, numDimensions_, numCallsIntEval_/vegasWorkspace_->iterations, vegasRnd_, vegasWorkspace_, &p, &pErr);
-      vegasWorkspace_->stage = 3;
-      ++iteration;
-      chi2 = vegasWorkspace_->chisq;
-    } while ( chi2 > maxChi2_ && iteration < maxIntEvalIter_ );	
+    intAlgo_->integrate(&g, xl_, xu_, numDimensions_, p, pErr);
+    if ( graph_xSection_times_Acc_ ) {
+      double xSection_times_AccErr = 0.;
+      double xSection_times_Acc = compCrossSection_times_Acc(graph_xSection_times_Acc_ , mTest, xSection_times_AccErr);
+      if ( xSection_times_Acc > 0. ) {
+	p /= xSection_times_Acc;
+	if ( p > 0. && xSection_times_Acc > 0. ) pErr = p*TMath::Sqrt(square(pErr/p) + square(xSection_times_AccErr/xSection_times_Acc));
+	else pErr = 0.;
+      } else {
+	p = 0.;
+	pErr = 0.;
+      }
+    }
     
     if ( verbosity_ >= 1 ) {
-      std::cout << " M(test) = " << mTest << ": p = " << p << " +/- " << pErr << " (chi2 = " << chi2 << ")" << std::endl;
+      std::cout << " M(test) = " << mTest << ": p = " << p << " +/- " << pErr << std::endl;
     }
  
     // CV: in order to reduce computing time, skip precise computation of integral
@@ -341,12 +409,9 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
   delete [] xl_;
   delete [] xu_;
 
-  delete [] (double*)vegasIntegrand_->params;
-  delete vegasIntegrand_;
-  gsl_monte_vegas_free(vegasWorkspace_);
-  gsl_rng_free(vegasRnd_);
+  delete intAlgo_;
 
   if ( verbosity_ >= 1 ) {
-    clock_->Show("<SVfitMEM2::integrate>");
+    clock_->Show("<SVfitMEM::integrate>");
   }
 }

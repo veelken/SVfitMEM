@@ -26,6 +26,7 @@ HttXsectionIntegrandWithTauDecays::HttXsectionIntegrandWithTauDecays(double sqrt
     mH2_(mH*mH),
     GammaH_(1.e-2*mH_),
     GammaH_times_mH_(GammaH_*mH_),
+    GammaH2_times_mH2_(square(GammaH_times_mH_)),
     sqrtS_(sqrtS),
     s_(square(sqrtS_)),
     invSqrtS_(1./sqrtS_),
@@ -161,12 +162,10 @@ HttXsectionIntegrandWithTauDecays::setInputs(int tau1Type, double vis1Mass, int 
 
 namespace
 {
-  double compDgDp2z(double vis1Pt2, double vis1Pz, double vis2Pz)
+  double compDgDp2z(double vis1Pz, double vis1P, double vis2Pz, double vis2P)
   {
-    double vis1Pz2 = square(vis1Pz);
-    double vis2Pz2 = square(vis2Pz);
-    if ( vis2Pz == 0. ) return 0.;
-    else return -2.*vis1Pz + 2.*TMath::Sqrt((vis1Pt2 + vis1Pz2)/(vis1Pt2 + vis2Pz2))*vis2Pz;
+    if ( vis2P <= 0. ) return 0.;
+    else return (2.*vis1P*vis2Pz - 2.*vis1Pz*vis2P)/vis2P;
   }
 
   double extractProbFromLUT(double x, const TH1* lut)
@@ -196,18 +195,22 @@ namespace
     //std::cout << " nunuEn = " << nunuEn << std::endl;
     //std::cout << " nunuP = " << nunuP << std::endl;
     //std::cout << " nunuMass = " << nunuMass << std::endl;
-    if ( x >= 0. && x <= 1. && nunuMass < TMath::Sqrt((1. - x)*tauLeptonMass2) ) { // physical solution
-      const double GFfactor = square(GF)/(2.*square(TMath::Pi()));
-      double nunuMass2 = square(nunuMass);
-      double visMass2 = square(visMass);
+    double visMass2 = square(visMass);
+    double nunuMass2 = square(nunuMass);
+    if ( x >= (visMass2/tauLeptonMass2) && x <= 1. && nunuMass2 < ((1. - x)*tauLeptonMass2) ) { // physical solution
+      const double GFfactor = square(GF)/square(TMath::Pi());
       double tauEn_rf = (tauLeptonMass2 + nunuMass2 - visMass2)/(2.*nunuMass);
       double visEn_rf = tauEn_rf - nunuMass;
-      if ( !(tauEn_rf > 0. && visEn_rf > 0.) ) return 0.;
+      if ( !(tauEn_rf >= tauLeptonMass && visEn_rf >= visMass) ) return 0.;
       double I = GFfactor*nunuMass2*(2.*tauEn_rf*visEn_rf - (2./3.)*TMath::Sqrt((square(tauEn_rf) - tauLeptonMass2)*(square(visEn_rf) - visMass2)));
       double cosThetaNuNu = compCosThetaNuNu(visEn, visP, visMass2, nunuEn, nunuP, nunuMass2);
-      //std::cout << "cosThetaNuNu = " << cosThetaNuNu << std::endl;
-      if ( !(cosThetaNuNu >= -1. && cosThetaNuNu <= +1.) ) return 0.;
+      const double epsilon = 1.e-3;
+      if ( !(cosThetaNuNu >= (-1. + epsilon) && cosThetaNuNu <= +1.) ) return 0.;
       double PSfactor = (visEn + nunuEn)*I/(8.*visP*square(x)*TMath::Sqrt(square(visP) + square(nunuP) + 2.*visP*nunuP*cosThetaNuNu + tauLeptonMass2));
+      //-------------------------------------------------------------------------
+      // CV: fudge factor to reproduce literature value for cross-section times branching fraction
+      PSfactor *= 2.;
+      //-------------------------------------------------------------------------
       return PSfactor;
     } else {
       return 0.;
@@ -227,17 +230,14 @@ namespace
     if ( x >= (visMass2/tauLeptonMass2) && x <= 1. ) { // physical solution
       double cosThetaNu = compCosThetaNuNu(visEn, visP, visMass2, nuEn, nuP, 0.);
       //std::cout << "cosThetaNu = " << cosThetaNu << std::endl;
-      if ( !(cosThetaNu >= -1. && cosThetaNu <= +1.) ) return 0.;
+      const double epsilon = 1.e-3;
+      if ( !(cosThetaNu >= (-1. + epsilon) && cosThetaNu <= +1.) ) return 0.;
       double PSfactor = (visEn + nuEn)/(8.*visP*square(x)*TMath::Sqrt(square(visP) + square(nuP) + 2.*visP*nuP*cosThetaNu + tauLeptonMass2));
       //-------------------------------------------------------------------------
       // CV: multiply by constant matrix element, 
       //     chosen such that the branching fraction of the tau to decay into hadrons is reproduced      
       const double M2 = 16.*TMath::Pi()*cube(tauLeptonMass)*GammaTauToHad/(tauLeptonMass2 - visMass2);
       PSfactor *= M2;
-      //-------------------------------------------------------------------------
-      //-------------------------------------------------------------------------
-      // CV: fudge factor to reproduce literature value for cross-section times branching fraction
-      PSfactor *= 0.5;
       //-------------------------------------------------------------------------
       return PSfactor;
     } else {
@@ -301,25 +301,29 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   if ( q2_ <= 0. ) return 0.;
 
   double mVis2 = x[3];
-  if ( mVis2 < 1.e-3*mH2_ ) return 0.;
+  //if ( mVis2 < 1.e-3*mH2_ ) return 0.;
   double x2 = mVis2/(q2_*x1);
   if ( !(x2 >= 1.e-5 && x2 <= 1.) ) return 0.;
 
   double vis2Px = -x2*vis1Px/x1;
   double vis2Py = -x2*vis1Py/x1;
   double vis1Pt2 = square(vis1P4.pt());
-  double term1 = mVis2 - 2.*vis1Pt2;
-  double term22 = mVis2*(mVis2 - 4.*vis1Pt2);
-  if ( term22 <= 0. || vis1Pt2 <= 0. ) return 0.;
-  double term2 = TMath::Sqrt(term22);
-  double vis2Pz_p = (vis1Pz*term1 + vis1P*term2)/(2.*vis1Pt2);
+  double x1_2 = square(x1);
+  double term1 = 2.*vis1Pt2*x1_2;
+  double term2 = mVis2*vis1Pz*x1_2 - 2.*vis1Pt2*vis1Pz*x1*x2;
+  double vis1P2 = square(vis1P);
+  double x1_3 = x1_2*x1;
+  double term3_2 = mVis2*vis1P2*x1_3*(mVis2*x1 - 4.*vis1Pt2*x2);
+  if ( term3_2 <= 0. || term1 <= 0. ) return 0.;
+  double term3 = TMath::Sqrt(term3_2);
+  double vis2Pz_p = (1./term1)*(term2 + term3);
   double vis2En_p = TMath::Sqrt(square(vis2Px) + square(vis2Py) + square(vis2Pz_p) + leg2Mass2_);
   LorentzVector vis2P4_p(vis2Px, vis2Py, vis2Pz_p, vis2En_p);
-  double absDgDp2z_p = TMath::Abs(compDgDp2z(vis1Pt2, vis1Pz, vis2Pz_p));
-  double vis2Pz_m = (vis1Pz*term1 - vis1P*term2)/(2.*vis1Pt2);
+  double absDgDp2z_p = TMath::Abs(compDgDp2z(vis1Pz, vis1P, vis2Pz_p, vis2P4_p.P()));
+  double vis2Pz_m = (1./term1)*(term2 - term3);
   double vis2En_m = TMath::Sqrt(square(vis2Px) + square(vis2Py) + square(vis2Pz_m) + leg2Mass2_);
   LorentzVector vis2P4_m(vis2Px, vis2Py, vis2Pz_m, vis2En_m);
-  double absDgDp2z_m = TMath::Abs(compDgDp2z(vis1Pt2, vis1Pz, vis2Pz_m));
+  double absDgDp2z_m = TMath::Abs(compDgDp2z(vis1Pz, vis1P, vis2Pz_m, vis2P4_m.P()));
   double prob = 0.;
   if ( TMath::Abs(vis2Pz_p) <= sqrtS_ && absDgDp2z_p != 0. ) { 
     double prob_p = compProb(x, vis1P4, x1, vis2P4_p, x2, absDgDp2z_p);
@@ -375,9 +379,9 @@ HttXsectionIntegrandWithTauDecays::compProb(const double* x, const LorentzVector
   leg2eZ_z_ = eZ2_.z();
 
   // compute neutrino and tau lepton four-vector for first tau
-  double nu1En    = vis1En*(1. - x1)/x1;
-  double nu1Mass  = ( idxLeg1_mNuNu_ != -1 ) ? TMath::Sqrt(x[idxLeg1_mNuNu_]) : 0.;
-  double nu1P     = TMath::Sqrt(TMath::Max(0., nu1En*nu1En - square(nu1Mass)));
+  double nu1En = vis1En*(1. - x1)/x1;
+  double nu1Mass = ( idxLeg1_mNuNu_ != -1 ) ? TMath::Sqrt(x[idxLeg1_mNuNu_]) : 0.;
+  double nu1P = TMath::Sqrt(TMath::Max(0., nu1En*nu1En - square(nu1Mass)));
   assert(idxLeg1_phi_ != -1);  
   double phiNu1 = x[idxLeg1_phi_];
   double cosThetaNu1 = compCosThetaNuNu(vis1En, vis1P, leg1Mass2_, nu1En, nu1P, square(nu1Mass));
@@ -398,9 +402,9 @@ HttXsectionIntegrandWithTauDecays::compProb(const double* x, const LorentzVector
   LorentzVector tau1P4(tau1Px, tau1Py, tau1Pz, tau1En);
 
   // compute neutrino and tau lepton four-vector for second tau
-  double nu2En    = vis2En*(1. - x2)/x2;
-  double nu2Mass  = ( idxLeg2_mNuNu_ != -1 ) ? TMath::Sqrt(x[idxLeg2_mNuNu_]) : 0.;
-  double nu2P     = TMath::Sqrt(TMath::Max(0., nu2En*nu2En - square(nu2Mass)));
+  double nu2En = vis2En*(1. - x2)/x2;
+  double nu2Mass = ( idxLeg2_mNuNu_ != -1 ) ? TMath::Sqrt(x[idxLeg2_mNuNu_]) : 0.;
+  double nu2P = TMath::Sqrt(TMath::Max(0., nu2En*nu2En - square(nu2Mass)));
   assert(idxLeg2_phi_ != -2);  
   double phiNu2 = x[idxLeg2_phi_];
   double cosThetaNu2 = compCosThetaNuNu(vis2En, vis2P, leg2Mass2_, nu2En, nu2P, square(nu2Mass));
@@ -498,7 +502,7 @@ HttXsectionIntegrandWithTauDecays::compProb(const double* x, const LorentzVector
   double prob_flux = (1./(s_*xa*xb));  
 
   // evaluate LO matrix element, 
-  // computed by Madgraph
+  // computed by Madgraph or taken from literature 
   madgraphGluon1P4_[0] =  0.5*xa*sqrtS_; 
   madgraphGluon1P4_[3] = +0.5*xa*sqrtS_;
   madgraphGluon2P4_[0] =  0.5*xb*sqrtS_;
@@ -567,9 +571,11 @@ HttXsectionIntegrandWithTauDecays::compProb(const double* x, const LorentzVector
   prob_PS_and_tauDecay *= square(TMath::Pi()/(tauLeptonMass*GammaTau));
 
   double jacobiFactor = 1./absDgDp2z;
-  double mVis_mem = (vis1P4_mem + vis2P4_mem).mass();
-  jacobiFactor *= (square(mVis_mem)/(square(q2_)*x1_mem))*(square(q2_ - mH2_) + square(GammaH_times_mH_))/GammaH_times_mH_;
-
+  double mVis2_mem = square((vis1P4_mem + vis2P4_mem).mass());
+  double q4 = square(q2_);
+  jacobiFactor *= (mVis2_mem/(q4*x1_mem));                                    // transformation from x2 to q^2
+  jacobiFactor *= (square(q2_ - mH2_) + GammaH2_times_mH2_)/GammaH_times_mH_; // parametrization of q^2 by tk (Eq. 8 of arXiv:1010.2263 without factor 1/pi, as agreed with Luca and Andrew)
+  jacobiFactor *= square(x2_mem);                                             // from delta-functions (tau1Px - tau2Px)*(tau1Py - tau2Py) = (vis1Px/x1 - vis2Px/x2)*(vis1Py/x1 - vis2Py/x2) 
   double prob = prob_flux*prob_PDF*prob_ME*prob_PS_and_tauDecay*prob_TF*prob_acceptance*jacobiFactor;
   if ( verbosity_ >= 2 ) {
     std::cout << "prob: flux = " << prob_flux << ", PDF = " << prob_PDF << ", ME = " << prob_ME << ", PS+decay = " << prob_PS_and_tauDecay << "," 

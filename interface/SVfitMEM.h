@@ -2,30 +2,31 @@
 #define TauAnalysis_SVfitMEM_SVfitMEM_h
 
 #include "TauAnalysis/SVfitMEM/interface/SVfitIntegrand.h"
+#include "TauAnalysis/SVfitMEM/interface/SVfitIntegratorBase.h"
 #include "TauAnalysis/SVfitMEM/interface/MeasuredTauLepton.h"
-
-#include <gsl/gsl_monte.h>
-#include <gsl/gsl_monte_vegas.h>
 
 #include <TBenchmark.h>
 #include <TFile.h>
+#include <TGraphErrors.h>
 #include <TMatrixD.h>
 #include <TMath.h>
 
 class SVfitMEM
 {
  public:
-  SVfitMEM(const std::string&, double, const std::string&, int = 0);
+  SVfitMEM(double, const std::string&, int = svFitMEM::SVfitIntegrand::kLiterature, const std::string& = "", int = 0); 
   ~SVfitMEM();
+
+  /// take cross-section*signal acceptance/efficiency into account
+  void setCrossSection_times_Acc(const TGraphErrors*);
 
   /// take resolution on energy of hadronic tau decays into account
   void shiftVisPt(bool value, TFile* inputFile);
 
-  /// number of function calls for VEGAS integration (default is 10000)
-  void setMaxObjFunctionCalls(unsigned value) 
+  /// number of function calls for Markov Chain and VEGAS integration (default is 100000)
+  void setMaxObjFunctionCalls(unsigned maxObjFunctionCalls) 
   { 
-    numCallsGridOpt_ = TMath::Nint(0.20*value);
-    numCallsIntEval_ = TMath::Nint(0.80*value);
+    maxObjFunctionCalls_ = maxObjFunctionCalls;
   }
 
   /// run integration 
@@ -45,15 +46,14 @@ class SVfitMEM
 
   std::vector<svFitMEM::MeasuredTauLepton> measuredTauLeptons_;
 
-  /// auxiliary variables for VEGAS integration
-  gsl_monte_function* vegasIntegrand_;
-  gsl_monte_vegas_state* vegasWorkspace_;
-  mutable gsl_rng* vegasRnd_;
-  unsigned numCallsGridOpt_;
-  unsigned numCallsIntEval_;
-  double maxChi2_;
-  unsigned maxIntEvalIter_;
+  /// interface to integration algorithm (either Markov Chain integration or VEGAS)
+  enum { kMarkovChain, kVEGAS }; 
+  int intMode_;
+  svFitMEM::SVfitIntegratorBase* intAlgo_;
+  unsigned maxObjFunctionCalls_;
   double precision_;
+
+  /// dimension of integration region
   unsigned numDimensions_;
 
   /// lower and upper boundary of integration region
@@ -66,6 +66,9 @@ class SVfitMEM
   double massErr_;
   /// maximum of likelihood function
   double Lmax_;
+
+  /// cross-section*signal acceptance/efficiency as function of mass
+  const TGraphErrors* graph_xSection_times_Acc_;
 
   /// resolution on Pt and mass of hadronic taus
   bool shiftVisPt_;  

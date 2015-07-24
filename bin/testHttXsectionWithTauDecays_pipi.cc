@@ -65,37 +65,36 @@ int main(int argc, char* argv[])
   //int mode = HttXsectionIntegrandWithTauDecays::kMadgraph;
   int mode = HttXsectionIntegrandWithTauDecays::kLiterature;
 
-  int leg1decayMode = MeasuredTauLepton::kTauToMuDecay;
-  //int leg1decayMode = MeasuredTauLepton::kTauToHadDecay;
+  //int leg1decayMode = MeasuredTauLepton::kTauToMuDecay;
+  int leg1decayMode = MeasuredTauLepton::kTauToHadDecay;
   double leg1Mass = 0.;
   if      ( leg1decayMode == MeasuredTauLepton::kTauToElecDecay ) leg1Mass = svFitMEM::electronMass;
   else if ( leg1decayMode == MeasuredTauLepton::kTauToMuDecay   ) leg1Mass = svFitMEM::muonMass;
   else if ( leg1decayMode == MeasuredTauLepton::kTauToHadDecay  ) leg1Mass = svFitMEM::chargedPionMass;
   else assert(0);
 
-  int leg2decayMode = MeasuredTauLepton::kTauToMuDecay;
-  //int leg2decayMode = MeasuredTauLepton::kTauToHadDecay;
+  //int leg2decayMode = MeasuredTauLepton::kTauToMuDecay;
+  int leg2decayMode = MeasuredTauLepton::kTauToHadDecay;
   double leg2Mass = 0.;
   if      ( leg2decayMode == MeasuredTauLepton::kTauToElecDecay ) leg2Mass = svFitMEM::electronMass;
   else if ( leg2decayMode == MeasuredTauLepton::kTauToMuDecay   ) leg2Mass = svFitMEM::muonMass;
-  //else if ( leg2decayMode == MeasuredTauLepton::kTauToHadDecay  ) leg2Mass = svFitMEM::rhoMesonMass;
-   else if ( leg2decayMode == MeasuredTauLepton::kTauToHadDecay  ) leg2Mass = svFitMEM::chargedPionMass;
+  else if ( leg2decayMode == MeasuredTauLepton::kTauToHadDecay  ) leg2Mass = svFitMEM::chargedPionMass;
   else assert(0);
   
   // define Higgs mass points 
   std::vector<double> mH;
   //mH.push_back(90.);
   mH.push_back(100.);
-  //mH.push_back(125.);
-  //mH.push_back(150.);
+  mH.push_back(125.);
+  mH.push_back(150.);
   //mH.push_back(160.);
-  //mH.push_back(200.);
-  //mH.push_back(250.);
-  //mH.push_back(300.);
-  //mH.push_back(350.);
-  //mH.push_back(400.);
-  //mH.push_back(450.);
-  //mH.push_back(500.);
+  mH.push_back(200.);
+  mH.push_back(250.);
+  mH.push_back(300.);
+  mH.push_back(350.);
+  mH.push_back(400.);
+  mH.push_back(450.);
+  mH.push_back(500.);
 
   // CV: compare cross-sections computed using MadGraph 
   //     with values computed by LHC XS working-group
@@ -173,8 +172,8 @@ int main(int argc, char* argv[])
   covMET[1][1] = 100.00;
 
   // CV: remove ".gz" suffix, as it is internally added by LHAPDF 
-  std::string pdfFileName = TString(findFile("TauAnalysis/SVfitMEM/data/cteq65.LHgrid.gz").data()).ReplaceAll(".gz", "").Data();
-  //std::string pdfFileName = TString(findFile("TauAnalysis/SVfitMEM/data/MSTW2008lo68cl.LHgrid.gz").data()).ReplaceAll(".gz", "").Data();
+  //std::string pdfFileName = TString(findFile("TauAnalysis/SVfitMEM/data/cteq65.LHgrid.gz").data()).ReplaceAll(".gz", "").Data();
+  std::string pdfFileName = TString(findFile("TauAnalysis/SVfitMEM/data/MSTW2008lo68cl.LHgrid.gz").data()).ReplaceAll(".gz", "").Data();
 
   int verbosity = 0;
 
@@ -189,8 +188,8 @@ int main(int argc, char* argv[])
     HttXsectionWithTauDecays HttXsection_woAcc(sqrtS, *mH_i, pdfFileName.data(), mode, findFile(madgraphFileNames[*mH_i]), verbosity);
     HttXsection_woAcc.setBR(branchingRatios[*mH_i]);
     HttXsection_woAcc.disableAcceptanceCuts();
-    //HttXsection_woAcc.setMaxObjFunctionCalls(500000); 
-    HttXsection_woAcc.setMaxObjFunctionCalls(10000); 
+    HttXsection_woAcc.setMaxObjFunctionCalls(5000000); 
+    //HttXsection_woAcc.setMaxObjFunctionCalls(100000); 
     HttXsection_woAcc.integrate(leg1decayMode, -1, leg1Mass, leg2decayMode, -1, leg2Mass, covMET);
     double xSection = HttXsection_woAcc.xSection();
     double xSectionErr = HttXsection_woAcc.xSectionErr();
@@ -219,7 +218,7 @@ int main(int argc, char* argv[])
     ++idxPoint;
   }
 
-  TFile* outputFile = new TFile("testHttXsectionWithTauDecays.root", "RECREATE");
+  TFile* outputFile = new TFile("testHttXsectionWithTauDecays_hadhad.root", "RECREATE");
   graph_Xsection->Write();
   graph_Acc->Write();
   delete outputFile;

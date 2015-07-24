@@ -98,6 +98,7 @@ class HttXsectionIntegrandWithTauDecays
   mutable double GammaH_;
   mutable double q2_;
   mutable double GammaH_times_mH_;
+  mutable double GammaH2_times_mH2_;
   
   double sqrtS_;
   double s_;

@@ -3,6 +3,7 @@
 
 #include "TauAnalysis/SVfitMEM/interface/MeasuredTauLepton.h"
 #include "TauAnalysis/SVfitMEM/interface/me_ggH_mg5.h"
+#include "TauAnalysis/SVfitMEM/interface/me_ggH_lit.h"
 
 #include <TMatrixD.h>
 
@@ -19,14 +20,14 @@ namespace svFitMEM
       TestMass        = 0x00000100
     };
 
-    SVfitIntegrand(const std::string&, double, const std::string&, int);
+    SVfitIntegrand(double, const std::string&, int, const std::string&, int);
     ~SVfitIntegrand();
   
-    void setIdxLeg1_t(int idx) { idxLeg1_t_ = idx; }
+    void setIdxLeg1_X(int idx) { idxLeg1_X_ = idx; }
     void setIdxLeg1_phi(int idx) { idxLeg1_phi_ = idx; }
     void setIdxLeg1VisPtShift(int idx) { idxLeg1VisPtShift_ = idx; }
     void setIdxLeg1_mNuNu(int idx) { idxLeg1_mNuNu_ = idx; }
-    void setIdxLeg2_X(int idx) { idxLeg2_X_ = idx; }
+    void setIdxLeg2_t(int idx) { idxLeg2_t_ = idx; }
     void setIdxLeg2_phi(int idx) { idxLeg2_phi_ = idx; }
     void setIdxLeg2VisPtShift(int idx) { idxLeg2VisPtShift_ = idx; }
     void setIdxLeg2_mNuNu(int idx) { idxLeg2_mNuNu_ = idx; }
@@ -45,10 +46,14 @@ namespace svFitMEM
     /// static pointer to this (needed for interfacing the likelihood function calls to VEGAS integration)
     static const SVfitIntegrand* gSVfitIntegrand;
 
+    enum { kMadgraph, kLiterature };
+
    protected:
     /// measured tau leptons
     MeasuredTauLepton measuredTauLepton1_;
     bool leg1isLep_;
+    double leg1Mass_;
+    double leg1Mass2_;
     double leg1eX_x_;
     double leg1eX_y_;
     double leg1eX_z_;
@@ -60,6 +65,8 @@ namespace svFitMEM
     double leg1eZ_z_;
     MeasuredTauLepton measuredTauLepton2_;
     bool leg2isLep_;
+    double leg2Mass_;
+    double leg2Mass2_;
     double leg2eX_x_;
     double leg2eX_y_;
     double leg2eX_z_;
@@ -70,11 +77,18 @@ namespace svFitMEM
     double leg2eZ_y_;
     double leg2eZ_z_;
 
-    double mVis_;
-    double mVis2_;
+    int mode_;
+
+    mutable double mVis_;
+    mutable double mVis2_;
     double mTest_;
     double mTest2_;
+    mutable double GammaH_;
+    mutable double q2_;
+    mutable double GammaH_times_mTest_;
+    mutable double GammaH2_times_mTest2_;
 
+    double sqrtS_;
     double s_;
     double invSqrtS_;
     Vector beamAxis_;
@@ -95,18 +109,20 @@ namespace svFitMEM
     const TH1* leg1lutVisPtRes_;
     const TH1* leg2lutVisPtRes_;
 
-    int idxLeg1_t_;
+    int idxLeg1_X_;
     int idxLeg1_phi_;
     int idxLeg1VisPtShift_;
     int idxLeg1_mNuNu_;
-    int idxLeg2_X_;
+    int idxLeg2_t_;
     int idxLeg2_phi_;
     int idxLeg2VisPtShift_;
     int idxLeg2_mNuNu_;
 
     static bool pdfIsInitialized_;
 
-    mutable me_ggH_mg5 madgraph_;
+    mutable me_ggH_mg5 me_madgraph_;
+    bool me_madgraph_isInitialized_;
+    mutable me_ggH_lit me_lit_;
     double* madgraphGluon1P4_;
     double* madgraphGluon2P4_;
     double* madgraphTau1P4_;
