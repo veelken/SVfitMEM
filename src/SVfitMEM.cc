@@ -37,11 +37,13 @@ SVfitMEM::SVfitMEM(double sqrtS, const std::string& pdfName, int mode, const std
     intMode_(kVEGAS),
     intAlgo_(0),
     maxObjFunctionCalls_(100000),
-    precision_(1.e-5),
+    precision_(1.e-4),
     numDimensions_(0),
     xl_(0),
     xu_(0),
-    graph_xSection_times_Acc_(0),
+    graph_xSection_(0),
+    graph_Acc_(0),
+    minAcc_(1.e-2),
     shiftVisPt_(false),
     lutVisPtResDM0_(0),
     lutVisPtResDM1_(0),
@@ -58,7 +60,8 @@ SVfitMEM::~SVfitMEM()
 {
   delete integrand_;
 
-  delete graph_xSection_times_Acc_;
+  delete graph_xSection_;
+  delete graph_Acc_;
 
   delete lutVisPtResDM0_;
   delete lutVisPtResDM1_;
@@ -67,9 +70,11 @@ SVfitMEM::~SVfitMEM()
   delete clock_;
 }
 
-void SVfitMEM::setCrossSection_times_Acc(const TGraphErrors* graph)
+void SVfitMEM::setCrossSection_times_Acc(const TGraphErrors* graph_xSection, const TGraphErrors* graph_Acc, double minAcc)
 {
-  graph_xSection_times_Acc_ = graph;
+  graph_xSection_ = graph_xSection;
+  graph_Acc_ = graph_Acc;
+  minAcc_ = minAcc;
 }
 
 namespace
@@ -124,41 +129,44 @@ namespace
     return (weight0*y0 + weight1*y1);
   }
 
-  double compCrossSection_times_Acc(const TGraphErrors* graph, double mTest, double& xSection_times_AccErr)
+  double compCrossSection_or_Acc(const TGraphErrors* graph, double mTest, double& xSection_or_AccErr)
   {
-    int numPoints = graph->GetN();
-    int idxPoint0 = -1;
-    int idxPoint1 = numPoints;
-    for ( int idxPoint = 0; idxPoint < numPoints; ++idxPoint ) {
+    int firstPoint = 0;
+    int lastPoint = graph->GetN() - 1;
+
+    int idxPoint0 = firstPoint - 1;
+    int idxPoint1 = lastPoint + 1;
+    for ( int idxPoint = firstPoint; idxPoint <= lastPoint; ++idxPoint ) {
       double x, y;
       graph->GetPoint(idxPoint, x, y);
       if ( x < mTest && idxPoint > idxPoint0 ) idxPoint0 = idxPoint;
       if ( x > mTest && idxPoint < idxPoint1 ) idxPoint1 = idxPoint;
     }
-    double xSection_times_Acc = 0.;
-    if ( idxPoint0 >= 0 && idxPoint1 < numPoints ) {
+    assert(idxPoint1 >= idxPoint0);
+    double xSection_or_Acc = 0.;
+    if ( idxPoint0 >= firstPoint && idxPoint1 <= lastPoint ) {
       double x0, y0;
       graph->GetPoint(idxPoint0, x0, y0);
       double x1, y1;
       graph->GetPoint(idxPoint1, x1, y1);
-      xSection_times_Acc = linearInterpolateY(mTest, x0, x1, y0, y1);
+      xSection_or_Acc = linearInterpolateY(mTest, x0, x1, y0, y1);
       double yErr0 = graph->GetErrorY(idxPoint0);
       double yErr1 = graph->GetErrorY(idxPoint1);
-      xSection_times_AccErr = linearInterpolateY(mTest, x0, x1, yErr0, yErr1);
-    } else if ( idxPoint0 == -1 ) {
+      xSection_or_AccErr = linearInterpolateY(mTest, x0, x1, yErr0, yErr1);
+    } else if ( idxPoint0 < firstPoint ) {
       double x, y;
-      graph->GetPoint(0, x, y);
-      xSection_times_Acc = y;
-      double yErr = graph->GetErrorY(0);
-      xSection_times_AccErr = yErr;
-    } else if ( idxPoint1 == numPoints ) {
+      graph->GetPoint(firstPoint, x, y);
+      xSection_or_Acc = y;
+      double yErr = graph->GetErrorY(firstPoint);
+      xSection_or_AccErr = yErr;
+    } else if ( idxPoint1 > lastPoint ) {
       double x, y;
-      graph->GetPoint(numPoints - 1, x, y);
-      xSection_times_Acc = y;
-      double yErr = graph->GetErrorY(numPoints - 1);
-      xSection_times_AccErr = yErr;
+      graph->GetPoint(lastPoint, x, y);
+      xSection_or_Acc = y;
+      double yErr = graph->GetErrorY(lastPoint);
+      xSection_or_AccErr = yErr;
     } else assert(0);
-    return xSection_times_Acc;
+    return xSection_or_Acc;
   }
 }
 
@@ -380,9 +388,21 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
       intAlgo_->integrate(&g_Fortran, xl_, xu_, numDimensions_, p, pErr);
     } else assert(0);    
 
-    if ( graph_xSection_times_Acc_ ) {
-      double xSection_times_AccErr = 0.;
-      double xSection_times_Acc = compCrossSection_times_Acc(graph_xSection_times_Acc_ , mTest, xSection_times_AccErr);
+    if ( graph_xSection_ ) {
+      double xSectionErr = 0.;
+      double xSection = compCrossSection_or_Acc(graph_xSection_, mTest, xSectionErr);
+      double xSection_times_Acc = xSection;
+      double xSection_times_AccErr = xSectionErr;
+      if ( graph_Acc_ ) {
+	double AccErr = 0.;
+	double Acc = compCrossSection_or_Acc(graph_Acc_, mTest, AccErr);
+	if ( Acc < minAcc_ ) Acc = minAcc_;
+	double xSection_times_AccRelErr2 = 0.;
+	if ( xSection > 0. ) xSection_times_AccRelErr2 += square(xSectionErr/xSection);
+	if ( Acc      > 0. ) xSection_times_AccRelErr2 += square(AccErr/Acc);
+	xSection_times_Acc = xSection*Acc;
+	xSection_times_AccErr = xSection_times_Acc*TMath::Sqrt(xSection_times_AccRelErr2);
+      }
       if ( xSection_times_Acc > 0. ) {
 	p /= xSection_times_Acc;
 	if ( p > 0. && xSection_times_Acc > 0. ) pErr = p*TMath::Sqrt(square(pErr/p) + square(xSection_times_AccErr/xSection_times_Acc));

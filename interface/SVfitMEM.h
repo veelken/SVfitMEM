@@ -18,7 +18,7 @@ class SVfitMEM
   ~SVfitMEM();
 
   /// take cross-section*signal acceptance/efficiency into account
-  void setCrossSection_times_Acc(const TGraphErrors*);
+  void setCrossSection_times_Acc(const TGraphErrors*, const TGraphErrors*, double);
 
   /// take resolution on energy of hadronic tau decays into account
   void shiftVisPt(bool value, TFile* inputFile);
@@ -75,7 +75,9 @@ class SVfitMEM
   double Lmax_;
 
   /// cross-section*signal acceptance/efficiency as function of mass
-  const TGraphErrors* graph_xSection_times_Acc_;
+  const TGraphErrors* graph_xSection_;
+  const TGraphErrors* graph_Acc_;
+  double minAcc_;
 
   /// resolution on Pt and mass of hadronic taus
   bool shiftVisPt_;  
