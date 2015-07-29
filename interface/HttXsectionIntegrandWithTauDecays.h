@@ -5,6 +5,8 @@
 #include "TauAnalysis/SVfitMEM/interface/me_ggH_mg5.h"
 #include "TauAnalysis/SVfitMEM/interface/me_ggH_lit.h"
 
+#include "LHAPDF/LHAPDF.h"
+
 #include <TMatrixD.h>
 
 class HttXsectionIntegrandWithTauDecays 
@@ -28,14 +30,14 @@ class HttXsectionIntegrandWithTauDecays
     acceptance_ = 0;
   }
   
-  void setIdxLeg1_X(int idx) { idxLeg1_X_ = idx; }
-  void setIdxLeg1_phi(int idx) { idxLeg1_phi_ = idx; }
-  void setIdxLeg1VisPtShift(int idx) { idxLeg1VisPtShift_ = idx; }
-  void setIdxLeg1_mNuNu(int idx) { idxLeg1_mNuNu_ = idx; }
-  void setIdxLeg2_t(int idx) { idxLeg2_t_ = idx; }
-  void setIdxLeg2_phi(int idx) { idxLeg2_phi_ = idx; }
-  void setIdxLeg2VisPtShift(int idx) { idxLeg2VisPtShift_ = idx; }
-  void setIdxLeg2_mNuNu(int idx) { idxLeg2_mNuNu_ = idx; }
+  void setIdxLeg1_X(int idx) { idxLeg1_X_ = idx; updateNumDimensions(); }
+  void setIdxLeg1_phi(int idx) { idxLeg1_phi_ = idx; updateNumDimensions(); }
+  void setIdxLeg1VisPtShift(int idx) { idxLeg1VisPtShift_ = idx; updateNumDimensions(); }
+  void setIdxLeg1_mNuNu(int idx) { idxLeg1_mNuNu_ = idx; updateNumDimensions(); }
+  void setIdxLeg2_t(int idx) { idxLeg2_t_ = idx; updateNumDimensions(); }
+  void setIdxLeg2_phi(int idx) { idxLeg2_phi_ = idx; updateNumDimensions(); }
+  void setIdxLeg2VisPtShift(int idx) { idxLeg2VisPtShift_ = idx; updateNumDimensions(); }
+  void setIdxLeg2_mNuNu(int idx) { idxLeg2_mNuNu_ = idx; updateNumDimensions(); }
   
   /// apply/do not apply transfer function for missing transverse energy
   void setApplyMEtTF(bool applyMEtTF) { applyMEtTF_ = applyMEtTF; }  
@@ -51,10 +53,12 @@ class HttXsectionIntegrandWithTauDecays
 
   /// static pointer to this (needed for interfacing the likelihood function calls to VEGAS integration)
   static const HttXsectionIntegrandWithTauDecays* gHttXsectionIntegrandWithTauDecays;
+  static int gNumInstances;
 
   enum { kMadgraph, kLiterature };
 
  protected:
+  void updateNumDimensions();
   double compProb(const double*, const svFitMEM::LorentzVector&, double, const svFitMEM::LorentzVector&, double, double) const;
 
   /// measured tau leptons
@@ -125,8 +129,10 @@ class HttXsectionIntegrandWithTauDecays
   int idxLeg2_phi_;
   int idxLeg2VisPtShift_;
   int idxLeg2_mNuNu_;
-  
-  static bool pdfIsInitialized_;
+  int numDimensions_;
+
+  LHAPDF::PDF* pdf_;
+  bool pdfIsInitialized_;
 
   mutable me_ggH_mg5 me_madgraph_;
   bool me_madgraph_isInitialized_;

@@ -21,7 +21,7 @@ namespace
   std::string findFile(const std::string& fileName)
   {
     edm::FileInPath inputFile(fileName);
-    if ( !inputFile.isLocal() ) {
+    if ( inputFile.fullPath() == "" ) {
       std::cerr << "Error: Cannot find file = " << fileName << " !!" << std::endl;
       assert(0);
     }
@@ -73,13 +73,13 @@ void singleEvent()
   //int mode = SVfitIntegrand::kMadgraph;
   int mode = SVfitIntegrand::kLiterature;
 
-  // CV: remove ".gz" suffix, as it is internally added by LHAPDF 
-  std::string pdfFileName = TString(findFile("TauAnalysis/SVfitMEM/data/cteq65.LHgrid.gz").data()).ReplaceAll(".gz", "").Data();
+  //std::string pdfName = "cteq66";
+  std::string pdfName = "MSTW2008lo68cl";
 
   std::string madgraphFileName = "TauAnalysis/SVfitMEM/data/param_card.dat";
 
   int verbosity = 1;
-  SVfitMEM svFitAlgo(sqrtS, pdfFileName.data(), mode, findFile(madgraphFileName), verbosity);
+  SVfitMEM svFitAlgo(sqrtS, pdfName.data(), mode, findFile(madgraphFileName), verbosity);
   //-----------------------------------------------------------------------------
   // CV: enable the following lines to take experimental resolution on hadronic tau energy into account
   //std::string visPtResFileName = findFile("TauAnalysis/SVfitMEM/data/svFitVisMassAndPtResolutionPDF.root");
@@ -92,16 +92,17 @@ void singleEvent()
   // CV: enable the following lines to take cross-section*signal acceptance/efficiency into account
   std::string xSection_times_AccFileName = "TauAnalysis/SVfitMEM/data/testHttXsectionWithTauDecays_hadhad.root";
   TFile* xSection_times_AccFile = new TFile(findFile(xSection_times_AccFileName).data());
-  const TGraphErrors* xSection_times_AccGraph = readGraphErrors(xSection_times_AccFile, "graph_Xsection_wAcc");
+  const TGraphErrors* xSection_times_AccGraph = readGraphErrors(xSection_times_AccFile, "graph_Xsection_wAcc_numCalls5000000_intMode2");
   svFitAlgo.setCrossSection_times_Acc(xSection_times_AccGraph);
   delete xSection_times_AccFile;
   //-----------------------------------------------------------------------------
-  svFitAlgo.setMaxObjFunctionCalls(2000);
+  svFitAlgo.setMaxObjFunctionCalls(100000);
+  svFitAlgo.setIntMode(SVfitMEM::kVAMP);
   svFitAlgo.integrate(measuredTauLeptons, measuredMETx, measuredMETy, covMET, "testSVfitMEM.root");
   double mass = svFitAlgo.mass();
   double massErr = svFitAlgo.massErr();
   double Lmax = svFitAlgo.Lmax();
-  std::cout << "mass = " << mass << " +/- " << massErr << ", Lmax = " << Lmax << " (expected values = 127.13, 23.47, 1.92e-18)" << std::endl;
+  std::cout << "mass = " << mass << " +/- " << massErr << ", Lmax = " << Lmax << " (expected values = 124.83, 6.09174, 1.28969e-07)" << std::endl;
 
   return;
 }

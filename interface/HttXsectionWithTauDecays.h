@@ -28,6 +28,12 @@ class HttXsectionWithTauDecays
     maxObjFunctionCalls_ = maxObjFunctionCalls;
   }
 
+  /// set integration algorithm (either Markov Chain integration, VEGAS or VAMP algorithm)
+  void setIntMode(int intMode)
+  {
+    intMode_ = intMode;
+  }
+
   /// enable/disable acceptance cuts
   void enableAcceptanceCuts(double (*acceptance)(const svFitMEM::LorentzVector&, const svFitMEM::LorentzVector&, double, double))
   {
@@ -48,6 +54,8 @@ class HttXsectionWithTauDecays
   /// return uncertainty on cross-section
   double xSectionErr() const { return xSectionErr_; }  
 
+  enum { kMarkovChain, kVEGAS, kVAMP }; 
+
  protected:
 
   bool applyMEtTF_;
@@ -58,8 +66,7 @@ class HttXsectionWithTauDecays
   double mH_;
   double mH2_;
 
-  /// interface to integration algorithm (either Markov Chain integration or VEGAS)
-  enum { kMarkovChain, kVEGAS }; 
+  /// interface to integration algorithm (either Markov Chain integration, VEGAS or VAMP algorithm)
   int intMode_;
   svFitMEM::SVfitIntegratorBase* intAlgo_;
   unsigned maxObjFunctionCalls_;

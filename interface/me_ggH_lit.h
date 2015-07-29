@@ -13,11 +13,13 @@
 
 #include "TauAnalysis/SVfitMEM/interface/svFitAuxFunctions.h"
 
+#include "LHAPDF/LHAPDF.h"
+
 class me_ggH_lit
 {
  public:
-  // Constructor and destructor
-  me_ggH_lit(bool = false, bool = true);
+  /// Constructor and destructor
+  me_ggH_lit(const std::string&, bool = false, bool = true);
   ~me_ggH_lit();
 
   void setS(double s) 
@@ -43,25 +45,25 @@ class me_ggH_lit
     br_isInitialized_ = true;
   }
   
-  // Get and set momenta for matrix element evaluation
+  /// Get and set momenta for matrix element evaluation
   void setMomenta(std::vector<double*>& momenta){ momenta_ = momenta; }
 
-  // Get matrix element.
+  /// Get matrix element.
   double getMatrixElement() const;
   double getMatrixElement_woHtoTauTauDecay() const;
 
  private:
-  // flag to enable/disable narrow-width approximation
+  /// flag to enable/disable narrow-width approximation
   bool applyNWA_;
 
-  // flag to include/not include Higgs -> tautau decay in matrix element
+  /// flag to include/not include Higgs -> tautau decay in matrix element
   bool includeHtoTauTauDecay_;
 
-  // center-of-mass energy
+  /// center-of-mass energy
   double s_;
   bool s_isInitialized_;
 
-  // Higgs mass, width and decay braching fraction
+  /// Higgs mass, width and decay braching fraction
   double mH_;
   double mH2_;
   bool mH_isInitialized_;
@@ -71,12 +73,16 @@ class me_ggH_lit
   double br_;
   bool br_isInitialized_;
 
-  // Mass of tau lepton pair
+  /// Mass of tau lepton pair
   mutable double q_;
   mutable double q2_;
 
-  // vector with momenta (to be changed each event)
+  /// vector with momenta (to be changed each event)
   std::vector<double*> momenta_;
+
+  /// PDF (needed to access alphaS)
+  LHAPDF::PDF* pdf_;
+  bool pdfIsInitialized_;
 }; 
 
 #endif 

@@ -3,6 +3,7 @@
 #include "TauAnalysis/SVfitMEM/interface/MeasuredTauLepton.h"
 #include "TauAnalysis/SVfitMEM/interface/SVfitIntegratorMarkovChain.h"
 #include "TauAnalysis/SVfitMEM/interface/SVfitIntegratorVEGAS.h"
+#include "TauAnalysis/SVfitMEM/interface/SVfitIntegratorVAMP.h"
 
 #include <TH1.h>
 
@@ -12,13 +13,24 @@ using namespace svFitMEM;
 
 namespace 
 {
-  double g(double* x, size_t dim, void* param)
+  double g_C(double* x, size_t dim, void* param)
   {    
-    return HttXsectionIntegrandWithTauDecays::gHttXsectionIntegrandWithTauDecays->Eval(x);
+    //std::cout << "<g_C>:" << std::endl;
+    double retVal = HttXsectionIntegrandWithTauDecays::gHttXsectionIntegrandWithTauDecays->Eval(x);
+    //std::cout << " retVal = " <<  retVal << std::endl;
+    return retVal;
+  }
+
+  double g_Fortran(double** x, size_t dim, void** param)
+  {    
+    //std::cout << "<g_Fortran>:" << std::endl;
+    double retVal = HttXsectionIntegrandWithTauDecays::gHttXsectionIntegrandWithTauDecays->Eval(*x);
+    //std::cout << " retVal = " <<  retVal << std::endl;
+    return retVal;
   }
 }
 
-HttXsectionWithTauDecays::HttXsectionWithTauDecays(double sqrtS, double mH, const std::string& pdfFileName, int mode, const std::string& madgraphFileName, int verbosity) 
+HttXsectionWithTauDecays::HttXsectionWithTauDecays(double sqrtS, double mH, const std::string& pdfName, int mode, const std::string& madgraphFileName, int verbosity) 
   : applyMEtTF_(false),
     applyAcceptanceCuts_(false),
     integrand_(0),
@@ -39,7 +51,7 @@ HttXsectionWithTauDecays::HttXsectionWithTauDecays(double sqrtS, double mH, cons
     clock_(0),
     verbosity_(verbosity)
 { 
-  integrand_ = new HttXsectionIntegrandWithTauDecays(sqrtS_, mH_, pdfFileName, mode, madgraphFileName, verbosity_);
+  integrand_ = new HttXsectionIntegrandWithTauDecays(sqrtS_, mH_, pdfName, mode, madgraphFileName, verbosity_);
   integrand_->setApplyMEtTF(applyMEtTF_);
 
   clock_ = new TBenchmark();
@@ -86,10 +98,10 @@ HttXsectionWithTauDecays::shiftVisPt(bool value, TFile* inputFile)
 void
 HttXsectionWithTauDecays::integrate(int tau1Type, int tau1DecayMode, double vis1Mass, int tau2Type, int tau2DecayMode, double vis2Mass, const TMatrixD& covMET)
 {
-  if ( verbosity_ >= 1 ) {
+  //if ( verbosity_ >= 1 ) {
     std::cout << "<HttXsectionWithTauDecays::integrate>:" << std::endl;
     clock_->Start("<HttXsectionWithTauDecays::integrate>");
-  }
+  //}
 
 //--- determine dimension of integration space 
   int idxLeg1_X = -1;
@@ -195,7 +207,12 @@ HttXsectionWithTauDecays::integrate(int tau1Type, int tau1DecayMode, double vis1
     unsigned numCallsIntEval = TMath::Nint(0.80*maxObjFunctionCalls_);
     intAlgo_ = new SVfitIntegratorVEGAS(
       numCallsGridOpt, numCallsIntEval, 
-      2., 20.);
+      2., 1);
+  } else if ( intMode_ == kVAMP ) {
+    unsigned numCallsGridOpt = TMath::Nint(0.20*maxObjFunctionCalls_);
+    unsigned numCallsIntEval = TMath::Nint(0.80*maxObjFunctionCalls_);
+    intAlgo_ = new SVfitIntegratorVAMP(
+      numCallsGridOpt, numCallsIntEval);
   } else {
     std::cerr << "<HttXsectionWithTauDecays::integrate>: Invalid Configuration Parameter 'intMode' = " << intMode_ << " --> ABORTING !!\n";
     assert(0);
@@ -251,8 +268,12 @@ HttXsectionWithTauDecays::integrate(int tau1Type, int tau1DecayMode, double vis1
     }
   }
 
-  intAlgo_->integrate(&g, xl_, xu_, numDimensions_, xSection_, xSectionErr_);
-    
+  if ( intMode_ == kMarkovChain || intMode_ == kVEGAS ) { 
+    intAlgo_->integrate(&g_C, xl_, xu_, numDimensions_, xSection_, xSectionErr_);
+  } else if ( intMode_ == kVAMP ) {
+    intAlgo_->integrate(&g_Fortran, xl_, xu_, numDimensions_, xSection_, xSectionErr_);
+  } else assert(0);    
+
   if ( verbosity_ >= 1 ) {
     std::cout << "--> cross-section = " << xSection_ << " +/- " << xSectionErr_ << std::endl;
   }
@@ -262,7 +283,7 @@ HttXsectionWithTauDecays::integrate(int tau1Type, int tau1DecayMode, double vis1
 
   delete intAlgo_;
 
-  if ( verbosity_ >= 1 ) {
+  //if ( verbosity_ >= 1 ) {
     clock_->Show("<HttXsectionWithTauDecays::integrate>");
-  }
+  //}
 }

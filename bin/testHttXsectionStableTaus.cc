@@ -16,7 +16,7 @@ namespace
   std::string findFile(const std::string& fileName)
   {
     edm::FileInPath inputFile(fileName);
-    if ( !inputFile.isLocal() ) {
+    if ( inputFile.fullPath() == "" ) {	
       std::cerr << "Error: Cannot find file = " << fileName << " !!" << std::endl;
       assert(0);
     }

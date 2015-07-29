@@ -30,14 +30,14 @@ namespace svFitMEM
     SVfitIntegratorVEGAS(unsigned, unsigned, double, unsigned);
     ~SVfitIntegratorVEGAS();
 
-    void integrate(SVfitIntegratorBase::gPtr, const double*, const double*, unsigned, double&, double&);
+    void integrate(SVfitIntegratorBase::gPtr_C, const double*, const double*, unsigned, double&, double&);
 
     void print(std::ostream&) const {}
 
    protected:
-    void setIntegrand(SVfitIntegratorBase::gPtr, const double*, const double*, unsigned);
+    void setIntegrand(SVfitIntegratorBase::gPtr_C, const double*, const double*, unsigned);
 
-    SVfitIntegratorBase::gPtr integrand_;
+    SVfitIntegratorBase::gPtr_C integrand_;
 
     gsl_monte_function* vegasIntegrand_;
     gsl_monte_vegas_state* vegasWorkspace_;

@@ -5,6 +5,8 @@
 #include "TauAnalysis/SVfitMEM/interface/me_ggH_mg5.h"
 #include "TauAnalysis/SVfitMEM/interface/me_ggH_lit.h"
 
+#include "LHAPDF/LHAPDF.h"
+
 #include <TMatrixD.h>
 
 namespace svFitMEM
@@ -118,7 +120,8 @@ namespace svFitMEM
     int idxLeg2VisPtShift_;
     int idxLeg2_mNuNu_;
 
-    static bool pdfIsInitialized_;
+    LHAPDF::PDF* pdf_;
+    bool pdfIsInitialized_;
 
     mutable me_ggH_mg5 me_madgraph_;
     bool me_madgraph_isInitialized_;

@@ -38,12 +38,12 @@ namespace svFitMEM
     /// in order to start path of chain transitions from non-random point
     void initializeStartPosition_and_Momentum(const double*);
 
-    void integrate(SVfitIntegratorBase::gPtr, const double*, const double*, unsigned, double&, double&);
-
+    void integrate(SVfitIntegratorBase::gPtr_C, const double*, const double*, unsigned, double&, double&);
+  
     void print(std::ostream&) const;
     
   protected:
-    void setIntegrand(SVfitIntegratorBase::gPtr, const double*, const double*, unsigned);
+    void setIntegrand(SVfitIntegratorBase::gPtr_C, const double*, const double*, unsigned);
 
     void initializeStartPosition_and_Momentum();
 
@@ -55,7 +55,7 @@ namespace svFitMEM
 
     double evalProb(const std::vector<double>&);
   
-    gPtr integrand_;
+    gPtr_C integrand_;
 
     /// parameters defining integration region
     ///  numDimensions: dimensionality of integration region (Hypercube)

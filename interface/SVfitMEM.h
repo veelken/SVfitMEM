@@ -29,6 +29,12 @@ class SVfitMEM
     maxObjFunctionCalls_ = maxObjFunctionCalls;
   }
 
+  /// set integration algorithm (either Markov Chain integration, VEGAS or VAMP algorithm)
+  void setIntMode(int intMode)
+  {
+    intMode_ = intMode;
+  }
+  
   /// run integration 
   void integrate(const std::vector<svFitMEM::MeasuredTauLepton>&, double, double, const TMatrixD&, const std::string& = "");
 
@@ -39,6 +45,8 @@ class SVfitMEM
   /// return maximum of likelihood function
   double Lmax() const { return Lmax_; }  
 
+  enum { kMarkovChain, kVEGAS, kVAMP }; 
+
  protected:
 
   svFitMEM::SVfitIntegrand* integrand_;
@@ -46,8 +54,7 @@ class SVfitMEM
 
   std::vector<svFitMEM::MeasuredTauLepton> measuredTauLeptons_;
 
-  /// interface to integration algorithm (either Markov Chain integration or VEGAS)
-  enum { kMarkovChain, kVEGAS }; 
+  /// interface to integration algorithm (either Markov Chain integration, VEGAS or VAMP)
   int intMode_;
   svFitMEM::SVfitIntegratorBase* intAlgo_;
   unsigned maxObjFunctionCalls_;

@@ -10,16 +10,11 @@
 
 using namespace svFitMEM;
 
-namespace LHAPDF {
-  void initPDFSet(int nset, const std::string& filename, int member=0);
-  double xfx(int nset, double x, double Q, int fl);
-}
-
 /// global function pointer, needed for VEGAS integration
 const HttXsectionIntegrandWithTauDecays* HttXsectionIntegrandWithTauDecays::gHttXsectionIntegrandWithTauDecays = 0;
-bool HttXsectionIntegrandWithTauDecays::pdfIsInitialized_ = false;
+int HttXsectionIntegrandWithTauDecays::gNumInstances = 0;
 
-HttXsectionIntegrandWithTauDecays::HttXsectionIntegrandWithTauDecays(double sqrtS, double mH, const std::string& pdfFileName, int mode, const std::string& madgraphFileName, int verbosity) 
+HttXsectionIntegrandWithTauDecays::HttXsectionIntegrandWithTauDecays(double sqrtS, double mH, const std::string& pdfName, int mode, const std::string& madgraphFileName, int verbosity) 
   : mode_(mode),
     applyMEtTF_(true),    
     mH_(mH),
@@ -43,9 +38,11 @@ HttXsectionIntegrandWithTauDecays::HttXsectionIntegrandWithTauDecays(double sqrt
     idxLeg2_phi_(-1),
     idxLeg2VisPtShift_(-1),
     idxLeg2_mNuNu_(-1),
+    pdf_(0),
+    pdfIsInitialized_(false),
     me_madgraph_(false, true),
     me_madgraph_isInitialized_(false),
-    me_lit_(false, true),
+    me_lit_(pdfName, false, true),
     isFirstCall_(true),
     histogramLogIntegrand_(0),    
     verbosity_(verbosity)
@@ -56,7 +53,7 @@ HttXsectionIntegrandWithTauDecays::HttXsectionIntegrandWithTauDecays(double sqrt
 
   // initialize PDF set
   if ( !pdfIsInitialized_ ) {
-    LHAPDF::initPDFSet(1, pdfFileName);
+    pdf_ = LHAPDF::mkPDF(pdfName.data(), 0);
     pdfIsInitialized_ = true;
   }
 
@@ -89,15 +86,19 @@ HttXsectionIntegrandWithTauDecays::HttXsectionIntegrandWithTauDecays(double sqrt
   madgraphTau2P4_ = new double[4];
   madgraphMomenta_.push_back(madgraphTau2P4_);
 
-  histogramLogIntegrand_ = new TH1D("histogramLogIntegrand", "histogramLogIntegrand", 2000, -1.e+2, +1.e+2);
+  std::string histogramNameLogIntegrand = Form("histogramLogIntegrand%i", gNumInstances);
+  histogramLogIntegrand_ = new TH1D(histogramNameLogIntegrand.data(), histogramNameLogIntegrand.data(), 2000, -1.e+2, +1.e+2);
   
   // set global function pointer to this
   gHttXsectionIntegrandWithTauDecays = this;
+  ++gNumInstances;
 }
 
 HttXsectionIntegrandWithTauDecays::~HttXsectionIntegrandWithTauDecays()
 {
   std::cout << "<HttXsectionIntegrandWithTauDecays::~HttXsectionIntegrandWithTauDecays>:" << std::endl;
+  delete pdf_;
+
   delete [] madgraphGluon1P4_;
   delete [] madgraphGluon2P4_;
   delete [] madgraphTau1P4_;
@@ -114,6 +115,20 @@ HttXsectionIntegrandWithTauDecays::~HttXsectionIntegrandWithTauDecays()
   delete outputFile;
 
   delete histogramLogIntegrand_;
+}
+
+void HttXsectionIntegrandWithTauDecays::updateNumDimensions()
+{
+  numDimensions_ = -1;
+  if ( idxLeg1_X_         >= numDimensions_ ) numDimensions_ = idxLeg1_X_;
+  if ( idxLeg1_phi_       >= numDimensions_ ) numDimensions_ = idxLeg1_phi_;
+  if ( idxLeg1VisPtShift_ >= numDimensions_ ) numDimensions_ = idxLeg1VisPtShift_;
+  if ( idxLeg1_mNuNu_     >= numDimensions_ ) numDimensions_ = idxLeg1_mNuNu_;
+  if ( idxLeg2_t_         >= numDimensions_ ) numDimensions_ = idxLeg2_t_;
+  if ( idxLeg2_phi_       >= numDimensions_ ) numDimensions_ = idxLeg2_phi_;
+  if ( idxLeg2VisPtShift_ >= numDimensions_ ) numDimensions_ = idxLeg2VisPtShift_;
+  if ( idxLeg2_mNuNu_     >= numDimensions_ ) numDimensions_ = idxLeg2_mNuNu_;
+  ++numDimensions_; // number of dimensions = max(idx) + 1
 }
 
 void 
@@ -255,6 +270,28 @@ namespace
     double x_bin = histogram->GetBinCenter(bin);
     histogram->Fill(x_bin);
   }
+
+  template <typename T>
+  std::string format_T_array(const T* array, unsigned d)
+  {
+    std::ostringstream os;
+    
+    os << "{ ";
+    
+    for ( unsigned i = 0; i < d; ++i ) {
+      os << array[i];
+      if ( i < (d - 1) ) os << ", ";
+    }
+    
+    os << " }";
+    
+    return os.str();
+  }
+  
+  std::string format_double_array(const double* array, unsigned d)
+  {
+    return format_T_array(array, d);
+  }
 }
 
 double
@@ -262,10 +299,11 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
 {
   if ( verbosity_ >= 2 ) {
     std::cout << "<HttXsectionIntegrandWithTauDecays::Eval(const double*)>:" << std::endl;
+    std::cout << " x = " << format_double_array(x, numDimensions_) << std::endl;
   }
 
   double visPtShift1 = ( idxLeg1VisPtShift_ != -1 && !leg1isLep_ ) ? 1./x[idxLeg1VisPtShift_] : 1.;
-  double visPtShift2 = ( idxLeg2VisPtShift_ != -1 && !leg2isLep_ ) ? 1./x[idxLeg2VisPtShift_] : 1.;
+  //double visPtShift2 = ( idxLeg2VisPtShift_ != -1 && !leg2isLep_ ) ? 1./x[idxLeg2VisPtShift_] : 1.;
   //std::cout << "visPtShift1 = " << visPtShift1 << ", visPtShift2 = " << visPtShift2 << std::endl;
 
   // compute four-vector of visible decay products for first tau
@@ -325,6 +363,7 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   LorentzVector vis2P4_m(vis2Px, vis2Py, vis2Pz_m, vis2En_m);
   double absDgDp2z_m = TMath::Abs(compDgDp2z(vis1Pz, vis1P, vis2Pz_m, vis2P4_m.P()));
   double prob = 0.;
+  //std::cout << " vis2Pz_p = " << vis2Pz_p << ", absDgDp2z_p = " << absDgDp2z_p << std::endl;
   if ( TMath::Abs(vis2Pz_p) <= sqrtS_ && absDgDp2z_p != 0. ) { 
     double prob_p = compProb(x, vis1P4, x1, vis2P4_p, x2, absDgDp2z_p);
     if ( verbosity_ >= 3 ) {
@@ -332,6 +371,7 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
     }
     prob += prob_p;
   }
+  //std::cout << " vis2Pz_m = " << vis2Pz_m << ", absDgDp2z_m = " << absDgDp2z_m << std::endl;
   if ( TMath::Abs(vis2Pz_m) <= sqrtS_ && absDgDp2z_m != 0. ) { 
     double prob_m = compProb(x, vis1P4, x1, vis2P4_m, x2, absDgDp2z_m);
     if ( verbosity_ >= 3 ) {
@@ -358,6 +398,9 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
 double
 HttXsectionIntegrandWithTauDecays::compProb(const double* x, const LorentzVector& vis1P4, double x1, const LorentzVector& vis2P4, double x2, double absDgDp2z) const
 {
+  //std::cout << "<compProb>:" << std::endl;
+  //std::cout << " absDgDp2z = " << absDgDp2z << std::endl;
+
   double vis1En = vis1P4.E();
   double vis1P = vis1P4.P();
 
@@ -494,8 +537,8 @@ HttXsectionIntegrandWithTauDecays::compProb(const double* x, const LorentzVector
   //double Q = mH_;
   double Q = ditauMass;
   assert(pdfIsInitialized_);
-  double fa = LHAPDF::xfx(1, xa, Q, 0)/xa;
-  double fb = LHAPDF::xfx(1, xb, Q, 0)/xb;
+  double fa = pdf_->xfxQ(21, xa, Q)/xa; // gluon distribution
+  double fb = pdf_->xfxQ(21, xb, Q)/xb;
   double prob_PDF = (fa*fb);
 
   // evaluate flux factor

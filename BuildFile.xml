@@ -2,6 +2,7 @@
 <use   name="rootcintex"/>
 <use   name="roofit"/>
 <use   name="lhapdf"/>
+<use   name="vamp"/>
 <export>
   <lib   name="1"/>
 </export>

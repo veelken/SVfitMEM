@@ -5,7 +5,8 @@
 using namespace svFitMEM;
 
 SVfitIntegratorVEGAS::SVfitIntegratorVEGAS(unsigned numCallsGridOpt, unsigned numCallsIntEval, double maxChi2, unsigned maxIntEvalIter)
-  : numCallsGridOpt_(numCallsGridOpt),
+  : integrand_(0),
+    numCallsGridOpt_(numCallsGridOpt),
     numCallsIntEval_(numCallsIntEval),
     maxChi2_(maxChi2),
     maxIntEvalIter_(maxIntEvalIter),
@@ -15,7 +16,7 @@ SVfitIntegratorVEGAS::SVfitIntegratorVEGAS(unsigned numCallsGridOpt, unsigned nu
 SVfitIntegratorVEGAS::~SVfitIntegratorVEGAS()
 {}
 
-void SVfitIntegratorVEGAS::setIntegrand(SVfitIntegratorBase::gPtr g, const double* xl, const double* xu, unsigned d)
+void SVfitIntegratorVEGAS::setIntegrand(SVfitIntegratorBase::gPtr_C g, const double* xl, const double* xu, unsigned d)
 {
   numDimensions_ = d;
   xl_ = new double[numDimensions_];
@@ -25,8 +26,10 @@ void SVfitIntegratorVEGAS::setIntegrand(SVfitIntegratorBase::gPtr g, const doubl
     xu_[iDimension] = xu[iDimension];
   }
 
+  integrand_ = g;
+
   vegasIntegrand_ = new gsl_monte_function;
-  vegasIntegrand_->f = g;
+  vegasIntegrand_->f = integrand_;
   vegasIntegrand_->dim = numDimensions_;
   vegasIntegrand_->params = new double[1];
   vegasWorkspace_ = gsl_monte_vegas_alloc(numDimensions_);
@@ -42,12 +45,12 @@ void SVfitIntegratorVEGAS::setIntegrand(SVfitIntegratorBase::gPtr g, const doubl
   vegasWorkspace_->stage = 1;
 }
 
-void SVfitIntegratorVEGAS::integrate(SVfitIntegratorBase::gPtr g, const double* xl, const double* xu, unsigned d, double& integral, double& integralErr)
+void SVfitIntegratorVEGAS::integrate(SVfitIntegratorBase::gPtr_C g, const double* xl, const double* xu, unsigned d, double& integral, double& integralErr)
 {
   setIntegrand(g, xl, xu, d);
   
   if ( !integrand_ ) {
-    std::cerr << "<SVfitStandaloneMarkovChainIntegrator>:"
+    std::cerr << "<SVfitIntegratorVEGAS>:"
 	      << "No integrand function has been set yet --> ABORTING !!\n";
     assert(0);
   }

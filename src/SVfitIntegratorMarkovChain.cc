@@ -136,7 +136,7 @@ SVfitIntegratorMarkovChain::~SVfitIntegratorMarkovChain()
   delete [] x_;
 }
 
-void SVfitIntegratorMarkovChain::setIntegrand(SVfitIntegratorBase::gPtr g, const double* xl, const double* xu, unsigned d)
+void SVfitIntegratorMarkovChain::setIntegrand(SVfitIntegratorBase::gPtr_C g, const double* xl, const double* xu, unsigned d)
 {
   numDimensions_ = d;
   
@@ -173,12 +173,12 @@ void SVfitIntegratorMarkovChain::setIntegrand(SVfitIntegratorBase::gPtr g, const
   integrand_ = g;
 }
 
-void SVfitIntegratorMarkovChain::integrate(SVfitIntegratorBase::gPtr g, const double* xl, const double* xu, unsigned d, double& integral, double& integralErr)
+void SVfitIntegratorMarkovChain::integrate(SVfitIntegratorBase::gPtr_C g, const double* xl, const double* xu, unsigned d, double& integral, double& integralErr)
 {
   setIntegrand(g, xl, xu, d);
 
   if ( !integrand_ ) {
-    std::cerr << "<SVfitStandaloneMarkovChainIntegrator>:"
+    std::cerr << "<SVfitIntegratorMarkovChain>:"
 	      << "No integrand function has been set yet --> ABORTING !!\n";
     assert(0);
   }

@@ -2,6 +2,7 @@
 
 #include "TauAnalysis/SVfitMEM/interface/SVfitIntegratorMarkovChain.h"
 #include "TauAnalysis/SVfitMEM/interface/SVfitIntegratorVEGAS.h"
+#include "TauAnalysis/SVfitMEM/interface/SVfitIntegratorVAMP.h"
 
 #include <TGraphErrors.h>
 #include <TH1.h>
@@ -12,13 +13,24 @@ using namespace svFitMEM;
 
 namespace 
 {
-  double g(double* x, size_t dim, void* param)
+  double g_C(double* x, size_t dim, void* param)
   {    
-    return SVfitIntegrand::gSVfitIntegrand->Eval(x);
+    //std::cout << "<g_C>:" << std::endl;
+    double retVal = SVfitIntegrand::gSVfitIntegrand->Eval(x);
+    //std::cout << " retVal = " <<  retVal << std::endl;
+    return retVal;
+  }
+
+  double g_Fortran(double** x, size_t dim, void** param)
+  {    
+    //std::cout << "<g_Fortran>:" << std::endl;
+    double retVal = SVfitIntegrand::gSVfitIntegrand->Eval(*x);
+    //std::cout << " retVal = " <<  retVal << std::endl;
+    return retVal;
   }
 }
 
-SVfitMEM::SVfitMEM(double sqrtS, const std::string& pdfFileName, int mode, const std::string& madgraphFileName, int verbosity) 
+SVfitMEM::SVfitMEM(double sqrtS, const std::string& pdfName, int mode, const std::string& madgraphFileName, int verbosity) 
   : integrand_(0),
     sqrtS_(sqrtS),
     //intMode_(kMarkovChain),
@@ -37,7 +49,7 @@ SVfitMEM::SVfitMEM(double sqrtS, const std::string& pdfFileName, int mode, const
     clock_(0),
     verbosity_(verbosity)
 { 
-  integrand_ = new SVfitIntegrand(sqrtS_, pdfFileName, mode, madgraphFileName, verbosity_);
+  integrand_ = new SVfitIntegrand(sqrtS_, pdfName, mode, madgraphFileName, verbosity_);
 
   clock_ = new TBenchmark();
 }
@@ -298,7 +310,12 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
     unsigned numCallsIntEval = TMath::Nint(0.80*maxObjFunctionCalls_);
     intAlgo_ = new SVfitIntegratorVEGAS(
       numCallsGridOpt, numCallsIntEval, 
-      2., 20.);
+      2., 1);
+  } else if ( intMode_ == kVAMP ) {
+    unsigned numCallsGridOpt = TMath::Nint(0.20*maxObjFunctionCalls_);
+    unsigned numCallsIntEval = TMath::Nint(0.80*maxObjFunctionCalls_);
+    intAlgo_ = new SVfitIntegratorVAMP(
+      numCallsGridOpt, numCallsIntEval);
   } else {
     std::cerr << "<SVfitMEM::integrate>: Invalid Configuration Parameter 'intMode' = " << intMode_ << " --> ABORTING !!\n";
     assert(0);
@@ -357,7 +374,12 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
   while ( mTest < sqrtS_ && !skipHighMassTail ) {
     integrand_->setMtest(mTest);
     
-    intAlgo_->integrate(&g, xl_, xu_, numDimensions_, p, pErr);
+    if ( intMode_ == kMarkovChain || intMode_ == kVEGAS ) { 
+      intAlgo_->integrate(&g_C, xl_, xu_, numDimensions_, p, pErr);
+    } else if ( intMode_ == kVAMP ) {
+      intAlgo_->integrate(&g_Fortran, xl_, xu_, numDimensions_, p, pErr);
+    } else assert(0);    
+
     if ( graph_xSection_times_Acc_ ) {
       double xSection_times_AccErr = 0.;
       double xSection_times_Acc = compCrossSection_times_Acc(graph_xSection_times_Acc_ , mTest, xSection_times_AccErr);

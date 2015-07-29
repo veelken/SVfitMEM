@@ -5,16 +5,10 @@
 
 using namespace svFitMEM;
 
-namespace LHAPDF {
-  void initPDFSet(int nset, const std::string& filename, int member=0);
-  double xfx(int nset, double x, double Q, int fl);
-}
-
 /// global function pointer, needed for VEGAS integration
 const HttXsectionIntegrandStableTaus* HttXsectionIntegrandStableTaus::gHttXsectionIntegrandStableTaus = 0;
-bool HttXsectionIntegrandStableTaus::pdfIsInitialized_ = false;
 
-HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus(double sqrtS, double mH, const std::string& pdfFileName, int mode, const std::string& madgraphFileName, int verbosity) 
+HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus(double sqrtS, double mH, const std::string& pdfName, int mode, const std::string& madgraphFileName, int verbosity) 
   : mode_(mode),
     mH_(mH),
     mH2_(mH*mH),
@@ -23,9 +17,11 @@ HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus(double sqrtS, dou
     s_(square(sqrtS_)),
     invSqrtS_(1./sqrtS_),
     beamAxis_(0., 0., 1.),
+    pdf_(0),
+    pdfIsInitialized_(false),
     me_madgraph_(false, true),
     me_madgraph_isInitialized_(false),
-    me_lit_(false, true),
+    me_lit_(pdfName, false, true),
     verbosity_(verbosity)
 {
   if ( verbosity_ ) {
@@ -34,7 +30,7 @@ HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus(double sqrtS, dou
 
   // initialize PDF set
   if ( !pdfIsInitialized_ ) {
-    LHAPDF::initPDFSet(1, pdfFileName);
+    pdf_ = LHAPDF::mkPDF(pdfName.data(), 0);
     pdfIsInitialized_ = true;
   }
 
@@ -74,6 +70,8 @@ HttXsectionIntegrandStableTaus::HttXsectionIntegrandStableTaus(double sqrtS, dou
 HttXsectionIntegrandStableTaus::~HttXsectionIntegrandStableTaus()
 {
   std::cout << "<HttXsectionIntegrandStableTaus::~HttXsectionIntegrandStableTaus>:" << std::endl;
+  delete pdf_;
+
   delete [] madgraphGluon1P4_;
   delete [] madgraphGluon2P4_;
   delete [] madgraphTau1P4_;
@@ -168,8 +166,8 @@ HttXsectionIntegrandStableTaus::compProb(double tau1Px, double tau1Py, double ta
   //double Q = mH_;
   double Q = ditauMass;
   assert(pdfIsInitialized_);
-  double fa = LHAPDF::xfx(1, xa, Q, 0)/xa;
-  double fb = LHAPDF::xfx(1, xb, Q, 0)/xb;
+  double fa = pdf_->xfxQ(21, xa, Q)/xa; // gluon distribution
+  double fb = pdf_->xfxQ(21, xb, Q)/xb;
   double prob_PDF = (fa*fb);
 
   // evaluate flux factor

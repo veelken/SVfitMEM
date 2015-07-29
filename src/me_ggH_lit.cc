@@ -10,11 +10,7 @@ const double mtop2 = svFitMEM::square(mtop);
 
 using namespace svFitMEM;
 
-namespace LHAPDF {
-  double alphasPDF(int nset, double Q);
-}
-
-me_ggH_lit::me_ggH_lit(bool applyNWA, bool includeHtoTauTauDecay)
+me_ggH_lit::me_ggH_lit(const std::string& pdfName, bool applyNWA, bool includeHtoTauTauDecay)
   : applyNWA_(applyNWA),
     includeHtoTauTauDecay_(includeHtoTauTauDecay),
     s_(0.),
@@ -26,11 +22,21 @@ me_ggH_lit::me_ggH_lit(bool applyNWA, bool includeHtoTauTauDecay)
     GammaH2_(0.),
     GammaH_isInitialized_(false),
     br_(0.),
-    br_isInitialized_(false)
-{}
+    br_isInitialized_(false),
+    pdf_(0),
+    pdfIsInitialized_(false)
+{
+  // initialize PDF set
+  if ( !pdfIsInitialized_ ) {
+    pdf_ = LHAPDF::mkPDF(pdfName.data(), 0);
+    pdfIsInitialized_ = true;
+  }
+}
  
 me_ggH_lit::~me_ggH_lit() 
-{}
+{
+  delete pdf_;
+}
 
 double me_ggH_lit::getMatrixElement() const
 {
@@ -95,8 +101,9 @@ double me_ggH_lit::getMatrixElement_woHtoTauTauDecay() const
 
   const double GF = 1.166e-5; // in units of GeV^-2, taken from http://pdg.lbl.gov/2014/reviews/rpp2014-rev-phys-constants.pdf
   const double constFactor = TMath::Sqrt(2)*GF/(256.*square(TMath::Pi()));
-  double Q = q_;
-  double alphaS = LHAPDF::alphasPDF(1, Q);
+  double Q2 = q2_;
+  assert(pdfIsInitialized_);
+  double alphaS = pdf_->alphasQ2(Q2);
   //std::cout << "Q = " << Q << ": alphaS = " << alphaS << std::endl;
   double me = constFactor*square(alphaS)*square(tau)*square(q2_)*(square(1. + (1. - tau)*Re_f) + square((1. - tau)*Im_f));
   //std::cout << "me = " << me << std::endl;

@@ -71,15 +71,15 @@ double gTF_hadTau(double* x, size_t dim, void* params_void)
   double tauP2 = square(tauP);
   double tauEn2 = tauP2 + tauLeptonMass2;
   double tauEn = TMath::Sqrt(tauEn2);
-  double tauEta = params[1];
-  double tauPhi = params[2];
+  //double tauEta = params[1];
+  //double tauPhi = params[2];
   double visMass = params[3];
   double visMass2 = square(visMass);
   double X = x[0];
   double nuEn = (1. - X)*tauEn;
   double nuP = nuEn; // nuMass = 0
   double nuP2 = square(nuP);
-  double phiNu = x[1];
+  //double phiNu = x[1];
   double cosThetaNu = ((1. - X)*tauEn2 - 0.5*(tauLeptonMass2 - visMass2))/(tauP*nuP);
   if ( !(cosThetaNu >= -1. && cosThetaNu <= +1.) ) return 0.;
   double visEn = TMath::Sqrt(tauP2 + nuP2 - 2.*tauP*nuP*cosThetaNu + visMass2);
@@ -107,8 +107,8 @@ double gTF_lepTau(double* x, size_t dim, void* params_void)
   double tauEn2 = tauP2 + tauLeptonMass2;
   double tauEn = TMath::Sqrt(tauEn2);
   //std::cout << "tauEn = " << tauEn << std::endl;
-  double tauEta = params[1];
-  double tauPhi = params[2];
+  //double tauEta = params[1];
+  //double tauPhi = params[2];
   double visMass = params[3];
   double visMass2 = square(visMass);
   double X = x[0];
@@ -120,7 +120,7 @@ double gTF_lepTau(double* x, size_t dim, void* params_void)
   double nunuP2 = nunuEn2 - nunuMass2;
   if ( !(nunuP2 > 0.) ) return 0.;
   double nunuP = TMath::Sqrt(nunuP2);
-  double phiNu = x[1];
+  //double phiNu = x[1];
   double cosThetaNuNu = ((1. - X)*tauEn2 - 0.5*(tauLeptonMass2 + nunuMass2 - visMass2))/(tauP*nunuP);
   if ( !(cosThetaNuNu >= -1. && cosThetaNuNu <= +1.) ) return 0.;
   double visEn = TMath::Sqrt(tauP2 + nunuP2 - 2.*tauP*nunuP*cosThetaNuNu + visMass2);

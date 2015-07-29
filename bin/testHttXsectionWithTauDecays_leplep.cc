@@ -19,7 +19,7 @@ namespace
   std::string findFile(const std::string& fileName)
   {
     edm::FileInPath inputFile(fileName);
-    if ( !inputFile.isLocal() ) {
+    if ( inputFile.fullPath() == "" ) {
       std::cerr << "Error: Cannot find file = " << fileName << " !!" << std::endl;
       assert(0);
     }
@@ -173,75 +173,137 @@ int main(int argc, char* argv[])
   covMET[0][1] =   0.00;
   covMET[1][1] = 100.00;
 
-  // CV: remove ".gz" suffix, as it is internally added by LHAPDF 
-  //std::string pdfFileName = TString(findFile("TauAnalysis/SVfitMEM/data/cteq65.LHgrid.gz").data()).ReplaceAll(".gz", "").Data();
-  std::string pdfFileName = TString(findFile("TauAnalysis/SVfitMEM/data/MSTW2008lo68cl.LHgrid.gz").data()).ReplaceAll(".gz", "").Data();
+  //std::string pdfName = "cteq66";
+  std::string pdfName = "MSTW2008lo68cl";
 
   int verbosity = 0;
 
-  TGraphErrors* graph_Xsection_woAcc = new TGraphErrors(mH.size());
-  TGraphErrors* graph_Xsection_times_BR_woAcc = new TGraphErrors(mH.size());
-  TGraphErrors* graph_Xsection_wAcc = new TGraphErrors(mH.size());
-  TGraphErrors* graph_Xsection_times_BR_wAcc = new TGraphErrors(mH.size());
-  TGraphErrors* graph_Acc = new TGraphErrors(mH.size());
+  std::vector<unsigned> numCalls;
+  numCalls.push_back(10000);
+  numCalls.push_back(20000);
+  numCalls.push_back(50000);
+  numCalls.push_back(100000);
+  numCalls.push_back(200000);
+  numCalls.push_back(500000);
+  numCalls.push_back(1000000);
+  numCalls.push_back(2000000);
+  numCalls.push_back(5000000);
+  
+  std::vector<int> intModes;
+  intModes.push_back(HttXsectionWithTauDecays::kVEGAS);
+  intModes.push_back(HttXsectionWithTauDecays::kVAMP);
 
-  int idxPoint = 0;
+  std::map<unsigned, std::map<int, TGraphErrors*> > graphs_Xsection_woAcc; // key = intMode, numCalls
+  std::map<unsigned, std::map<int, TGraphErrors*> > graphs_Xsection_times_BR_woAcc;
+  TGraphErrors* graph_Xsection_times_BR_woAcc_literature = new TGraphErrors(mH.size()); 
+  graph_Xsection_times_BR_woAcc_literature->SetName("graph_Xsection_times_BR_woAcc_literature");
+  std::map<unsigned, std::map<int, TGraphErrors*> > graphs_Xsection_wAcc;
+  std::map<unsigned, std::map<int, TGraphErrors*> > graphs_Xsection_times_BR_wAcc;
+  std::map<unsigned, std::map<int, TGraphErrors*> > graphs_Acc;
+  std::map<unsigned, std::map<int, int> > idxPoints;
+  for ( std::vector<unsigned>::const_iterator numCalls_i = numCalls.begin();
+	numCalls_i != numCalls.end(); ++numCalls_i ) {
+    for ( std::vector<int>::const_iterator intMode = intModes.begin();
+	  intMode != intModes.end(); ++intMode ) {
+      TGraphErrors* graph_Xsection_woAcc = new TGraphErrors(mH.size()); 
+      std::string graphName_Xsection_woAcc = Form("graph_Xsection_woAcc_numCalls%u_intMode%i", *numCalls_i, *intMode);
+      graph_Xsection_woAcc->SetName(graphName_Xsection_woAcc.data());
+      graphs_Xsection_woAcc[*intMode][*numCalls_i] = graph_Xsection_woAcc;
+      TGraphErrors* graph_Xsection_times_BR_woAcc = new TGraphErrors(mH.size()); 
+      std::string graphName_Xsection_times_BR_woAcc = Form("graph_Xsection_times_BR_woAcc_numCalls%u_intMode%i", *numCalls_i, *intMode);
+      graph_Xsection_times_BR_woAcc->SetName(graphName_Xsection_times_BR_woAcc.data());
+      graphs_Xsection_times_BR_woAcc[*intMode][*numCalls_i] = graph_Xsection_times_BR_woAcc;
+      TGraphErrors* graph_Xsection_wAcc = new TGraphErrors(mH.size()); 
+      std::string graphName_Xsection_wAcc = Form("graph_Xsection_wAcc_numCalls%u_intMode%i", *numCalls_i, *intMode);
+      graph_Xsection_wAcc->SetName(graphName_Xsection_wAcc.data());
+      graphs_Xsection_wAcc[*intMode][*numCalls_i] = graph_Xsection_wAcc;
+      TGraphErrors* graph_Xsection_times_BR_wAcc = new TGraphErrors(mH.size()); 
+      std::string graphName_Xsection_times_BR_wAcc = Form("graph_Xsection_times_BR_wAcc_numCalls%u_intMode%i", *numCalls_i, *intMode);
+      graph_Xsection_times_BR_wAcc->SetName(graphName_Xsection_times_BR_wAcc.data());
+      graphs_Xsection_times_BR_wAcc[*intMode][*numCalls_i] = graph_Xsection_times_BR_wAcc;
+      TGraphErrors* graph_Acc = new TGraphErrors(mH.size()); 
+      std::string graphName_Acc = Form("graph_Acc_numCalls%u_intMode%i", *numCalls_i, *intMode);
+      graph_Acc->SetName(graphName_Acc.data());
+      graphs_Acc[*intMode][*numCalls_i] = graph_Acc;
+
+      idxPoints[*intMode][*numCalls_i] = 0;
+    }
+  }
+
+  int idxPoint_literature = 0;
   for ( std::vector<double>::const_iterator mH_i = mH.begin();
 	mH_i != mH.end(); ++mH_i ) {
-    std::cout << "computing cross-sections for mH = " << (*mH_i) << "..." << std::endl;
+    for ( std::vector<unsigned>::const_iterator numCalls_i = numCalls.begin();
+	  numCalls_i != numCalls.end(); ++numCalls_i ) {
+      for ( std::vector<int>::const_iterator intMode = intModes.begin();
+	    intMode != intModes.end(); ++intMode ) {
+	std::cout << "computing cross-sections for mH = " << (*mH_i) << " (intMode = " << (*intMode) << ", numCalls = " << (*numCalls_i) << ")..." << std::endl;
+	
+	int idxPoint = idxPoints[*intMode][*numCalls_i];
+	++idxPoints[*intMode][*numCalls_i];
 
-    std::cout << "without acceptance cuts:" << std::endl;    
-    HttXsectionWithTauDecays HttXsection_woAcc(sqrtS, *mH_i, pdfFileName.data(), mode, findFile(madgraphFileNames[*mH_i]), verbosity);
-    HttXsection_woAcc.setBR(branchingRatios[*mH_i]);
-    HttXsection_woAcc.disableAcceptanceCuts();
-    HttXsection_woAcc.setMaxObjFunctionCalls(5000000); 
-    //HttXsection_woAcc.setMaxObjFunctionCalls(100000); 
-    HttXsection_woAcc.integrate(leg1decayMode, -1, leg1Mass, leg2decayMode, -1, leg2Mass, covMET);
-    double xSection_times_BR = HttXsection_woAcc.xSection();
-    double xSection_times_BRerr = HttXsection_woAcc.xSectionErr();
-    std::cout << "mH = " << (*mH_i) << " (GammaH = " << 1.e-2*(*mH_i) << "):" 
-	      << " cross-section = " << xSection_times_BR << " +/- " << xSection_times_BRerr << " pb" 
-	      << " (expected = " << xSection_times_BR_targets_14TeV[*mH_i] << " pb, ratio = " << xSection_times_BR/xSection_times_BR_targets_14TeV[*mH_i] << ")" << std::endl;
-    graph_Xsection_woAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR/branchingRatios[*mH_i]);
-    graph_Xsection_woAcc->SetPointError(idxPoint, 0., xSection_times_BRerr/branchingRatios[*mH_i]);
-    graph_Xsection_times_BR_woAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR);
-    graph_Xsection_times_BR_woAcc->SetPointError(idxPoint, 0., xSection_times_BRerr);
+	std::cout << "without acceptance cuts:" << std::endl;    
+	HttXsectionWithTauDecays HttXsection_woAcc(sqrtS, *mH_i, pdfName.data(), mode, findFile(madgraphFileNames[*mH_i]), verbosity);
+	HttXsection_woAcc.setBR(branchingRatios[*mH_i]);
+	HttXsection_woAcc.disableAcceptanceCuts();
+	HttXsection_woAcc.setMaxObjFunctionCalls(*numCalls_i);
+	HttXsection_woAcc.setIntMode(*intMode);
+	HttXsection_woAcc.integrate(leg1decayMode, -1, leg1Mass, leg2decayMode, -1, leg2Mass, covMET);
+	double xSection_times_BR = HttXsection_woAcc.xSection();
+	double xSection_times_BRerr = HttXsection_woAcc.xSectionErr();
+	std::cout << "mH = " << (*mH_i) << " (GammaH = " << 1.e-2*(*mH_i) << "):" 
+		  << " cross-section = " << xSection_times_BR << " +/- " << xSection_times_BRerr << " pb" 
+		  << " (expected = " << xSection_times_BR_targets_14TeV[*mH_i] << " pb, ratio = " << xSection_times_BR/xSection_times_BR_targets_14TeV[*mH_i] << ")" << std::endl;
+	TGraphErrors* graph_Xsection_woAcc = graphs_Xsection_woAcc[*intMode][*numCalls_i];
+	graph_Xsection_woAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR/branchingRatios[*mH_i]);
+	graph_Xsection_woAcc->SetPointError(idxPoint, 0., xSection_times_BRerr/branchingRatios[*mH_i]);
+	TGraphErrors* graph_Xsection_times_BR_woAcc = graphs_Xsection_times_BR_woAcc[*intMode][*numCalls_i];
+	graph_Xsection_times_BR_woAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR);
+	graph_Xsection_times_BR_woAcc->SetPointError(idxPoint, 0., xSection_times_BRerr);
+	
+	std::cout << "with acceptance cuts:" << std::endl;
+	HttXsectionWithTauDecays HttXsection_wAcc(sqrtS, *mH_i, pdfName.data(), mode, findFile(madgraphFileNames[*mH_i]), verbosity);
+	HttXsection_wAcc.setBR(branchingRatios[*mH_i]);
+	HttXsection_wAcc.enableAcceptanceCuts(&acceptanceLepLep);
+	HttXsection_wAcc.setMaxObjFunctionCalls(*numCalls_i);
+	HttXsection_wAcc.setIntMode(*intMode);
+	HttXsection_wAcc.integrate(leg1decayMode, -1, leg1Mass, leg2decayMode, -1, leg2Mass, covMET);
+	double xSection_times_BR_times_Acc = HttXsection_wAcc.xSection();
+	double xSection_times_BR_times_AccErr = HttXsection_wAcc.xSectionErr();
+	std::cout << "cross-section*acceptance = " << xSection_times_BR_times_Acc << " +/- " << xSection_times_BR_times_AccErr << " pb" << std::endl;
+	TGraphErrors* graph_Xsection_wAcc = graphs_Xsection_wAcc[*intMode][*numCalls_i];
+	graph_Xsection_wAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR_times_Acc/branchingRatios[*mH_i]);
+	graph_Xsection_wAcc->SetPointError(idxPoint, 0., xSection_times_BR_times_AccErr/branchingRatios[*mH_i]);
+	TGraphErrors* graph_Xsection_times_BR_wAcc = graphs_Xsection_times_BR_wAcc[*intMode][*numCalls_i];
+	graph_Xsection_times_BR_wAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR_times_Acc);
+	graph_Xsection_times_BR_wAcc->SetPointError(idxPoint, 0., xSection_times_BR_times_AccErr);
 
-    std::cout << "with acceptance cuts:" << std::endl;
-    HttXsectionWithTauDecays HttXsection_wAcc(sqrtS, *mH_i, pdfFileName.data(), mode, findFile(madgraphFileNames[*mH_i]), verbosity);
-    HttXsection_wAcc.setBR(branchingRatios[*mH_i]);
-    HttXsection_wAcc.enableAcceptanceCuts(&acceptanceLepLep);
-    HttXsection_wAcc.setMaxObjFunctionCalls(5000000); 
-    //HttXsection_wAcc.setMaxObjFunctionCalls(10000); 
-    HttXsection_wAcc.integrate(leg1decayMode, -1, leg1Mass, leg2decayMode, -1, leg2Mass, covMET);
-    double xSection_times_BR_times_Acc = HttXsection_wAcc.xSection();
-    double xSection_times_BR_times_AccErr = HttXsection_wAcc.xSectionErr();
-    std::cout << "cross-section*acceptance = " << xSection_times_BR_times_Acc << " +/- " << xSection_times_BR_times_AccErr << " pb" << std::endl;
-    graph_Xsection_wAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR_times_Acc/branchingRatios[*mH_i]);
-    graph_Xsection_wAcc->SetPointError(idxPoint, 0., xSection_times_BR_times_AccErr/branchingRatios[*mH_i]);
-    graph_Xsection_times_BR_wAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR_times_Acc);
-    graph_Xsection_times_BR_wAcc->SetPointError(idxPoint, 0., xSection_times_BR_times_AccErr);
-
-    double Acc = xSection_times_BR_times_Acc/xSection_times_BR;
-    double AccErr = Acc*TMath::Sqrt(square(xSection_times_BR_times_AccErr/xSection_times_BR_times_Acc) + square(xSection_times_BRerr/xSection_times_BR));
-    graph_Acc->SetPoint(idxPoint, *mH_i, Acc);
-    graph_Acc->SetPointError(idxPoint, 0., AccErr);
-    std::cout << "acceptance = " << Acc << " +/- " << AccErr << std::endl;    
-
-    ++idxPoint;
+	double Acc = xSection_times_BR_times_Acc/xSection_times_BR;
+	double AccErr = Acc*TMath::Sqrt(square(xSection_times_BR_times_AccErr/xSection_times_BR_times_Acc) + square(xSection_times_BRerr/xSection_times_BR));
+	TGraphErrors* graph_Acc = graphs_Acc[*intMode][*numCalls_i];
+	graph_Acc->SetPoint(idxPoint, *mH_i, Acc);
+	graph_Acc->SetPointError(idxPoint, 0., AccErr);
+	std::cout << "acceptance = " << Acc << " +/- " << AccErr << std::endl;    
+      }
+    }
+    graph_Xsection_times_BR_woAcc_literature->SetPoint(idxPoint_literature, *mH_i, xSection_times_BR_targets_14TeV[*mH_i]);
+    graph_Xsection_times_BR_woAcc_literature->SetPointError(idxPoint_literature, 0., 0.20*xSection_times_BR_targets_14TeV[*mH_i]);
+    ++idxPoint_literature;
   }
 
   TFile* outputFile = new TFile("testHttXsectionWithTauDecays_leplep.root", "RECREATE");
-  graph_Xsection_woAcc->SetName("graph_Xsection_woAcc");
-  graph_Xsection_woAcc->Write();
-  graph_Xsection_times_BR_woAcc->SetName("graph_Xsection_times_BR_woAcc");
-  graph_Xsection_times_BR_woAcc->Write();
-  graph_Xsection_wAcc->SetName("graph_Xsection_wAcc");
-  graph_Xsection_wAcc->Write();
-  graph_Xsection_times_BR_wAcc->SetName("graph_Xsection_times_BR_wAcc");
-  graph_Xsection_times_BR_wAcc->Write();
-  graph_Acc->SetName("graph_Acc");
-  graph_Acc->Write();
+  for ( std::vector<unsigned>::const_iterator numCalls_i = numCalls.begin();
+	numCalls_i != numCalls.end(); ++numCalls_i ) {
+    for ( std::vector<int>::const_iterator intMode = intModes.begin();
+	  intMode != intModes.end(); ++intMode ) {
+      graphs_Xsection_woAcc[*intMode][*numCalls_i]->Write();
+      graphs_Xsection_times_BR_woAcc[*intMode][*numCalls_i]->Write();
+      graphs_Xsection_wAcc[*intMode][*numCalls_i]->Write();
+      graphs_Xsection_times_BR_wAcc[*intMode][*numCalls_i]->Write();
+      graphs_Acc[*intMode][*numCalls_i]->Write();
+    }
+  }
+  graph_Xsection_times_BR_woAcc_literature->Write();
   delete outputFile;
 
   return 0;

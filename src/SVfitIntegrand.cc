@@ -10,16 +10,10 @@
 
 using namespace svFitMEM;
 
-namespace LHAPDF {
-  void initPDFSet(int nset, const std::string& filename, int member=0);
-  double xfx(int nset, double x, double Q, int fl);
-}
-
 /// global function pointer, needed for VEGAS integration
 const SVfitIntegrand* SVfitIntegrand::gSVfitIntegrand = 0;
-bool SVfitIntegrand::pdfIsInitialized_ = false;
 
-SVfitIntegrand::SVfitIntegrand(double sqrtS, const std::string& pdfFileName, int mode, const std::string& madgraphFileName, int verbosity) 
+SVfitIntegrand::SVfitIntegrand(double sqrtS, const std::string& pdfName, int mode, const std::string& madgraphFileName, int verbosity) 
   : mode_(mode),
     mTest_(0.),
     mTest2_(0.),
@@ -42,9 +36,11 @@ SVfitIntegrand::SVfitIntegrand(double sqrtS, const std::string& pdfFileName, int
     idxLeg2_phi_(-1),
     idxLeg2VisPtShift_(-1),
     idxLeg2_mNuNu_(-1),
+    pdf_(0),
+    pdfIsInitialized_(false),
     me_madgraph_(false, true),
     me_madgraph_isInitialized_(false),
-    me_lit_(false, true),
+    me_lit_(pdfName, false, true),
     errorCode_(0),
     verbosity_(verbosity)
 {
@@ -54,7 +50,7 @@ SVfitIntegrand::SVfitIntegrand(double sqrtS, const std::string& pdfFileName, int
 
   // initialize PDF set
   if ( !pdfIsInitialized_ ) {
-    LHAPDF::initPDFSet(1, pdfFileName);
+    pdf_ = LHAPDF::mkPDF(pdfName.data(), 0);
     pdfIsInitialized_ = true;
   }
 
@@ -94,6 +90,9 @@ SVfitIntegrand::SVfitIntegrand(double sqrtS, const std::string& pdfFileName, int
 
 SVfitIntegrand::~SVfitIntegrand()
 {
+  std::cout << "<SVfitIntegrand::~SVfitIntegrand>:" << std::endl;
+  delete pdf_;
+
   delete [] madgraphGluon1P4_;
   delete [] madgraphGluon2P4_;
   delete [] madgraphTau1P4_;
@@ -324,8 +323,6 @@ SVfitIntegrand::Eval(const double* x) const
   double vis1En = TMath::Sqrt(square(vis1Px) + square(vis1Py) + square(vis1Pz) + leg1Mass2_);
   LorentzVector vis1P4(vis1Px, vis1Py, vis1Pz, vis1En);
   double vis1P = vis1P4.P();
-  double vis1Theta = vis1P4.theta();
-  double vis1Phi = vis1P4.phi();
 
   // compute four-vector of visible decay products for second tau
   double vis2Px = visPtShift2*measuredTauLepton2_.px();
@@ -334,8 +331,6 @@ SVfitIntegrand::Eval(const double* x) const
   double vis2En = TMath::Sqrt(square(vis2Px) + square(vis2Py) + square(vis2Pz) + leg2Mass2_);
   LorentzVector vis2P4(vis2Px, vis2Py, vis2Pz, vis2En);
   double vis2P = vis2P4.P();
-  double vis2Theta = vis2P4.theta();
-  double vis2Phi = vis2P4.phi();
 
   // compute visible energy fractions for both taus
   assert(idxLeg1_X_ != -1);
@@ -457,8 +452,8 @@ SVfitIntegrand::Eval(const double* x) const
   //double Q = mTest_;
   double Q = ditauMass;
   assert(pdfIsInitialized_);
-  double fa = LHAPDF::xfx(1, xa, Q, 0)/xa;
-  double fb = LHAPDF::xfx(1, xb, Q, 0)/xb;
+  double fa = pdf_->xfxQ(21, xa, Q)/xa; // gluon distribution
+  double fb = pdf_->xfxQ(21, xb, Q)/xb;
   double prob_PDF = (fa*fb);
 
   // evaluate flux factor
