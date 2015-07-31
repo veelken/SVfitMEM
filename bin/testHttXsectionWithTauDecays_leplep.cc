@@ -18,12 +18,16 @@ namespace
 {
   std::string findFile(const std::string& fileName)
   {
-    edm::FileInPath inputFile(fileName);
-    if ( inputFile.fullPath() == "" ) {
-      std::cerr << "Error: Cannot find file = " << fileName << " !!" << std::endl;
-      assert(0);
+    if ( fileName != "" ) {
+      edm::FileInPath inputFile(fileName);
+      if ( inputFile.fullPath() == "" ) {
+	std::cerr << "Error: Cannot find file = " << fileName << " !!" << std::endl;
+	assert(0);
+      }
+      return inputFile.fullPath().data();
+    } else {
+      return "";
     }
-    return inputFile.fullPath().data();
   }
 }
 
@@ -84,19 +88,10 @@ int main(int argc, char* argv[])
   else assert(0);
   
   // define Higgs mass points 
-  std::vector<double> mH;
-  //mH.push_back(90.);
-  mH.push_back(100.);
-  mH.push_back(125.);
-  mH.push_back(150.);
-  //mH.push_back(160.);
-  mH.push_back(200.);
-  mH.push_back(250.);
-  mH.push_back(300.);
-  mH.push_back(350.);
-  mH.push_back(400.);
-  mH.push_back(450.);
-  mH.push_back(500.);
+  std::vector<double> mH;  
+  for ( double mH_i = 100.; mH_i <= 2500.; mH_i += 50. ) {
+    mH.push_back(mH_i);
+  }
 
   // CV: compare cross-sections computed using MadGraph 
   //     with values computed by LHC XS working-group

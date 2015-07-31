@@ -92,8 +92,9 @@ void singleEvent()
   // CV: enable the following lines to take cross-section*signal acceptance/efficiency into account
   std::string xSection_times_AccFileName = "TauAnalysis/SVfitMEM/data/testHttXsectionWithTauDecays_hadhad.root";
   TFile* xSection_times_AccFile = new TFile(findFile(xSection_times_AccFileName).data());
-  const TGraphErrors* xSection_times_AccGraph = readGraphErrors(xSection_times_AccFile, "graph_Xsection_wAcc_numCalls5000000_intMode2");
-  svFitAlgo.setCrossSection_times_Acc(xSection_times_AccGraph);
+  const TGraphErrors* graph_xSection = readGraphErrors(xSection_times_AccFile, "graph_Xsection_woAcc_numCalls5000000_intMode2");
+  const TGraphErrors* graph_Acc = readGraphErrors(xSection_times_AccFile, "graph_Acc_numCalls5000000_intMode2");
+  svFitAlgo.setCrossSection_times_Acc(graph_xSection, graph_Acc, 1.e-2);
   delete xSection_times_AccFile;
   //-----------------------------------------------------------------------------
   svFitAlgo.setMaxObjFunctionCalls(100000);
@@ -102,7 +103,7 @@ void singleEvent()
   double mass = svFitAlgo.mass();
   double massErr = svFitAlgo.massErr();
   double Lmax = svFitAlgo.Lmax();
-  std::cout << "mass = " << mass << " +/- " << massErr << ", Lmax = " << Lmax << " (expected values = 124.83, 6.09174, 1.28969e-07)" << std::endl;
+  std::cout << "mass = " << mass << " +/- " << massErr << ", Lmax = " << Lmax << " (expected values = 122.63, 9.03, Lmax = 2.91e-08)" << std::endl;
 
   return;
 }
