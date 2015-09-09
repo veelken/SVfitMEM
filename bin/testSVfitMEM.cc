@@ -90,20 +90,26 @@ void singleEvent()
   //-----------------------------------------------------------------------------
   //-----------------------------------------------------------------------------
   // CV: enable the following lines to take cross-section*signal acceptance/efficiency into account
-  std::string xSection_times_AccFileName = "TauAnalysis/SVfitMEM/data/testHttXsectionWithTauDecays_hadhad.root";
+  std::string xSection_times_AccFileName = "TauAnalysis/SVfitMEM/data/svFitMEM_xSection_and_AccCorr_hadhad.root";
   TFile* xSection_times_AccFile = new TFile(findFile(xSection_times_AccFileName).data());
-  const TGraphErrors* graph_xSection = readGraphErrors(xSection_times_AccFile, "graph_Xsection_woAcc_numCalls5000000_intMode2");
-  const TGraphErrors* graph_Acc = readGraphErrors(xSection_times_AccFile, "graph_Acc_numCalls5000000_intMode2");
-  svFitAlgo.setCrossSection_times_Acc(graph_xSection, graph_Acc, 1.e-2);
+  const TGraphErrors* graph_xSection = readGraphErrors(xSection_times_AccFile, "graph_Xsection_woAcc_hadhad_vamp");
+  //const TGraphErrors* graph_Acc = readGraphErrors(xSection_times_AccFile, "graph_Acc_hadhad_vamp");
+  //svFitAlgo.setCrossSection_and_Acc(graph_xSection, graph_Acc, 1.e-2);
+  svFitAlgo.setCrossSection(graph_xSection);
   delete xSection_times_AccFile;
   //-----------------------------------------------------------------------------
-  svFitAlgo.setMaxObjFunctionCalls(100000);
+  //-----------------------------------------------------------------------------
+  // CV: enable the following line to add an additional log(mTauTau) term to the nll to suppress high mass tail in mTauTau distribution (default is false)
+  svFitAlgo.addLogM(true, 1.e+1);
+  //-----------------------------------------------------------------------------
+  svFitAlgo.setMaxObjFunctionCalls(20000);
   svFitAlgo.setIntMode(SVfitMEM::kVAMP);
+  //svFitAlgo.setIntMode(SVfitMEM::kVEGAS);
   svFitAlgo.integrate(measuredTauLeptons, measuredMETx, measuredMETy, covMET, "testSVfitMEM.root");
   double mass = svFitAlgo.mass();
   double massErr = svFitAlgo.massErr();
   double Lmax = svFitAlgo.Lmax();
-  std::cout << "mass = " << mass << " +/- " << massErr << ", Lmax = " << Lmax << " (expected values = 122.63, 9.03, Lmax = 2.91e-08)" << std::endl;
+  std::cout << "mass = " << mass << " +/- " << massErr << ", Lmax = " << Lmax << " (expected values = 121.505 +/- 15.281, Lmax = 1.11915e-10)" << std::endl;
 
   return;
 }

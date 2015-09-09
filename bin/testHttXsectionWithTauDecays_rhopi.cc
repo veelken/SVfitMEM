@@ -27,21 +27,25 @@ namespace
   }
 }
 
-double acceptanceTauTau(const svFitMEM::LorentzVector& visTau1P4, const svFitMEM::LorentzVector& visTau2P4, double metPx, double metPy)
+class acceptanceTypeHadHad : public acceptanceBaseType
 {
-  //std::cout << "<acceptanceTauTau>:" << std::endl;
-  //std::cout << " visTau1: Pt = " << visTau1P4.pt() << ", eta = " << visTau1P4.eta() << ", phi = " << visTau1P4.phi() << ", mass = " << visTau1P4.mass() << std::endl;
-  //std::cout << " visTau2: Pt = " << visTau2P4.pt() << ", eta = " << visTau2P4.eta() << ", phi = " << visTau2P4.phi() << ", mass = " << visTau2P4.mass() << std::endl;
-  double acceptance = 0.;
-  if ( (visTau1P4.pt() > 45. && TMath::Abs(visTau1P4.eta()) < 2.3 &&
-	visTau2P4.pt() > 45. && TMath::Abs(visTau2P4.eta()) < 2.3) ) {
-    acceptance = 1.; // CV: acceptance only, efficiency not taken into account yet
-  } else {
-    acceptance = 0.;
+ public:
+  double operator()(const svFitMEM::LorentzVector& visTau1P4, const svFitMEM::LorentzVector& visTau2P4, double metPx, double metPy) const
+  {
+    //std::cout << "<acceptanceHadHad>:" << std::endl;
+    //std::cout << " visTau1: Pt = " << visTau1P4.pt() << ", eta = " << visTau1P4.eta() << ", phi = " << visTau1P4.phi() << ", mass = " << visTau1P4.mass() << std::endl;
+    //std::cout << " visTau2: Pt = " << visTau2P4.pt() << ", eta = " << visTau2P4.eta() << ", phi = " << visTau2P4.phi() << ", mass = " << visTau2P4.mass() << std::endl;
+    double acceptance = 0.;
+    if ( (visTau1P4.pt() > 45. && TMath::Abs(visTau1P4.eta()) < 2.1 &&
+	  visTau2P4.pt() > 45. && TMath::Abs(visTau2P4.eta()) < 2.1) ) {
+      acceptance = 1.; // CV: acceptance only, efficiency not taken into account yet
+    } else {
+      acceptance = 0.;
+    }
+    //std::cout << "--> returning acceptance = " << acceptance << std::endl;
+    return acceptance;
   }
-  //std::cout << "--> returning acceptance = " << acceptance << std::endl;
-  return acceptance;
-}
+};
 
 double getBR(int decayMode)
 {
@@ -203,7 +207,8 @@ int main(int argc, char* argv[])
     std::cout << "with acceptance cuts:" << std::endl;
     HttXsectionWithTauDecays HttXsection_wAcc(sqrtS, *mH_i, pdfFileName.data(), mode, findFile(madgraphFileNames[*mH_i]), verbosity);
     HttXsection_wAcc.setBR(branchingRatios[*mH_i]);
-    HttXsection_wAcc.enableAcceptanceCuts(&acceptanceTauTau);
+    acceptanceTypeHadHad acceptanceHadHad;
+    HttXsection_wAcc.enableAcceptanceCuts(acceptanceHadHad);
     //HttXsection_wAcc.setMaxObjFunctionCalls(500000); 
     HttXsection_wAcc.setMaxObjFunctionCalls(10000); 
     HttXsection_wAcc.integrate(leg1decayMode, -1, leg1Mass, leg2decayMode, -1, leg2Mass, covMET);

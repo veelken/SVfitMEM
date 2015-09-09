@@ -99,7 +99,14 @@ namespace svFitMEM
 
   double roundToNdigits(double, int = 3);
 
-  TGraphErrors* makeGraph(const std::string&, const std::vector<double>&, const std::vector<double>&, const std::vector<double>&, const std::vector<double>&);
+  struct GraphPoint
+  {
+    double x_;
+    double xErr_;
+    double y_;
+    double yErr_;    
+  };
+  TGraphErrors* makeGraph(const std::string&, const std::vector<GraphPoint>&);
 
   void extractResult(TGraphErrors*, double&, double&, double&, int = 0);
 

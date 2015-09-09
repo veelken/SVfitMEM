@@ -35,7 +35,7 @@ class HttXsectionWithTauDecays
   }
 
   /// enable/disable acceptance cuts
-  void enableAcceptanceCuts(double (*acceptance)(const svFitMEM::LorentzVector&, const svFitMEM::LorentzVector&, double, double))
+  void enableAcceptanceCuts(const acceptanceBaseType& acceptance)
   {
     integrand_->enableAcceptanceCuts(acceptance);
     applyAcceptanceCuts_ = true;

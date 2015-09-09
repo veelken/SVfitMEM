@@ -42,7 +42,8 @@
 
       call tao_random_create(rng, seed=0)
       call clear_exception(exc)
-      call vamp_create_grid(grid, domain, num_calls=numCallsGridOpt)
+      call vamp_create_grid(grid, domain, num_calls=numCallsGridOpt,    &
+     &exc=exc)
       call handle_exception(exc)
 
       call clear_exception(exc)
@@ -56,6 +57,9 @@
       call clear_exception(exc)
       call vamp_sample_grid(rng, grid, vamp_fct, NO_DATA, 4,            &
      &vamp_integral, vamp_error, vamp_chi2, exc=exc)
+      call handle_exception(exc)
+      call clear_exception(exc)
+      call vamp_delete_grid(grid)
       call handle_exception(exc)
 !      print *, "integral = ", vamp_integral, " +/- ", vamp_error
 !      print *, " (chi^2 = ", vamp_chi2, ")"

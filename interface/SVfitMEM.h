@@ -18,7 +18,15 @@ class SVfitMEM
   ~SVfitMEM();
 
   /// take cross-section*signal acceptance/efficiency into account
-  void setCrossSection_times_Acc(const TGraphErrors*, const TGraphErrors*, double);
+  void setCrossSection(const TGraphErrors*);  
+  void setCrossSection_and_Acc(const TGraphErrors*, const TGraphErrors*, double);
+
+  /// add an additional log(mTauTau) term to the nll to suppress high mass tail in mTauTau distribution (default is false)
+  void addLogM(bool value, double power = 1.) 
+  { 
+    addLogM_ = value; 
+    addLogM_power_ = power; 
+  }
 
   /// take resolution on energy of hadronic tau decays into account
   void shiftVisPt(bool value, TFile* inputFile);
@@ -78,6 +86,10 @@ class SVfitMEM
   const TGraphErrors* graph_xSection_;
   const TGraphErrors* graph_Acc_;
   double minAcc_;
+
+  /// flag to enable/disable addition of log(mTauTau) term to the nll to suppress high mass tail in mTauTau distribution 
+  bool addLogM_; 
+  double addLogM_power_; 
 
   /// resolution on Pt and mass of hadronic taus
   bool shiftVisPt_;  

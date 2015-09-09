@@ -31,21 +31,25 @@ namespace
   }
 }
 
-double acceptanceLepHad(const svFitMEM::LorentzVector& visTau1P4, const svFitMEM::LorentzVector& visTau2P4, double metPx, double metPy)
+class acceptanceTypeLepHad : public acceptanceBaseType
 {
-  //std::cout << "<acceptanceLepHad>:" << std::endl;
-  //std::cout << " visTau1: Pt = " << visTau1P4.pt() << ", eta = " << visTau1P4.eta() << ", phi = " << visTau1P4.phi() << ", mass = " << visTau1P4.mass() << std::endl;
-  //std::cout << " visTau2: Pt = " << visTau2P4.pt() << ", eta = " << visTau2P4.eta() << ", phi = " << visTau2P4.phi() << ", mass = " << visTau2P4.mass() << std::endl;
-  double acceptance = 0.;
-  if ( (visTau1P4.pt() > 20. && TMath::Abs(visTau1P4.eta()) < 2.1 &&
-	visTau2P4.pt() > 20. && TMath::Abs(visTau2P4.eta()) < 2.3) ) {
-    acceptance = 1.; // CV: acceptance only, efficiency not taken into account yet
-  } else {
-    acceptance = 0.;
+ public:
+  double operator()(const svFitMEM::LorentzVector& visTau1P4, const svFitMEM::LorentzVector& visTau2P4, double metPx, double metPy) const
+  {
+    //std::cout << "<acceptanceLepHad>:" << std::endl;
+    //std::cout << " visTau1: Pt = " << visTau1P4.pt() << ", eta = " << visTau1P4.eta() << ", phi = " << visTau1P4.phi() << ", mass = " << visTau1P4.mass() << std::endl;
+    //std::cout << " visTau2: Pt = " << visTau2P4.pt() << ", eta = " << visTau2P4.eta() << ", phi = " << visTau2P4.phi() << ", mass = " << visTau2P4.mass() << std::endl;
+    double acceptance = 0.;
+    if ( (visTau1P4.pt() > 20. && TMath::Abs(visTau1P4.eta()) < 2.1 &&
+	  visTau2P4.pt() > 20. && TMath::Abs(visTau2P4.eta()) < 2.3) ) {
+      acceptance = 1.; // CV: acceptance only, efficiency not taken into account yet
+    } else {
+      acceptance = 0.;
+    }
+    //std::cout << "--> returning acceptance = " << acceptance << std::endl;
+    return acceptance;
   }
-  //std::cout << "--> returning acceptance = " << acceptance << std::endl;
-  return acceptance;
-}
+};
 
 double getBR(int decayMode)
 {
@@ -236,9 +240,12 @@ int main(int argc, char* argv[])
 	int idxPoint = idxPoints[*intMode][*numCalls_i];
 	++idxPoints[*intMode][*numCalls_i];
 
+	//double branchingRatio = branchingRatios[*mH_i];
+	double branchingRatio = 1.e-1; // set Higgs -> tautau decay branching fraction to value used by SVfitIntegrand
+
 	std::cout << "without acceptance cuts:" << std::endl;    
 	HttXsectionWithTauDecays HttXsection_woAcc(sqrtS, *mH_i, pdfName.data(), mode, findFile(madgraphFileNames[*mH_i]), verbosity);
-	HttXsection_woAcc.setBR(branchingRatios[*mH_i]);
+	HttXsection_woAcc.setBR(branchingRatio);
 	HttXsection_woAcc.disableAcceptanceCuts();
 	HttXsection_woAcc.setMaxObjFunctionCalls(*numCalls_i);
 	HttXsection_woAcc.setIntMode(*intMode);
@@ -249,16 +256,17 @@ int main(int argc, char* argv[])
 		  << " cross-section = " << xSection_times_BR << " +/- " << xSection_times_BRerr << " pb" 
 		  << " (expected = " << xSection_times_BR_targets_14TeV[*mH_i] << " pb, ratio = " << xSection_times_BR/xSection_times_BR_targets_14TeV[*mH_i] << ")" << std::endl;
 	TGraphErrors* graph_Xsection_woAcc = graphs_Xsection_woAcc[*intMode][*numCalls_i];
-	graph_Xsection_woAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR/branchingRatios[*mH_i]);
-	graph_Xsection_woAcc->SetPointError(idxPoint, 0., xSection_times_BRerr/branchingRatios[*mH_i]);
+	graph_Xsection_woAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR/branchingRatio);
+	graph_Xsection_woAcc->SetPointError(idxPoint, 0., xSection_times_BRerr/branchingRatio);
 	TGraphErrors* graph_Xsection_times_BR_woAcc = graphs_Xsection_times_BR_woAcc[*intMode][*numCalls_i];
 	graph_Xsection_times_BR_woAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR);
 	graph_Xsection_times_BR_woAcc->SetPointError(idxPoint, 0., xSection_times_BRerr);
  
 	std::cout << "with acceptance cuts:" << std::endl;
 	HttXsectionWithTauDecays HttXsection_wAcc(sqrtS, *mH_i, pdfName.data(), mode, findFile(madgraphFileNames[*mH_i]), verbosity);
-	HttXsection_wAcc.setBR(branchingRatios[*mH_i]);
-	HttXsection_wAcc.enableAcceptanceCuts(&acceptanceLepHad);
+	HttXsection_wAcc.setBR(branchingRatio);
+	acceptanceTypeLepHad acceptanceLepHad;
+	HttXsection_wAcc.enableAcceptanceCuts(acceptanceLepHad);
 	HttXsection_wAcc.setMaxObjFunctionCalls(*numCalls_i);
 	HttXsection_wAcc.setIntMode(*intMode);
 	HttXsection_wAcc.integrate(leg1decayMode, -1, leg1Mass, leg2decayMode, -1, leg2Mass, covMET);
@@ -266,8 +274,8 @@ int main(int argc, char* argv[])
 	double xSection_times_BR_times_AccErr = HttXsection_wAcc.xSectionErr();
 	std::cout << "cross-section*acceptance = " << xSection_times_BR_times_Acc << " +/- " << xSection_times_BR_times_AccErr << " pb" << std::endl;
 	TGraphErrors* graph_Xsection_wAcc = graphs_Xsection_wAcc[*intMode][*numCalls_i];
-	graph_Xsection_wAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR_times_Acc/branchingRatios[*mH_i]);
-	graph_Xsection_wAcc->SetPointError(idxPoint, 0., xSection_times_BR_times_AccErr/branchingRatios[*mH_i]);
+	graph_Xsection_wAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR_times_Acc/branchingRatio);
+	graph_Xsection_wAcc->SetPointError(idxPoint, 0., xSection_times_BR_times_AccErr/branchingRatio);
 	TGraphErrors* graph_Xsection_times_BR_wAcc = graphs_Xsection_times_BR_wAcc[*intMode][*numCalls_i];
 	graph_Xsection_times_BR_wAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR_times_Acc);
 	graph_Xsection_times_BR_wAcc->SetPointError(idxPoint, 0., xSection_times_BR_times_AccErr);

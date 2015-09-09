@@ -5,6 +5,7 @@
 */
 
 #include "TauAnalysis/SVfitMEM/interface/svFitAuxFunctions.h"
+#include "TauAnalysis/SVfitTF/interface/CrystalBall.h"
 
 #include <gsl/gsl_monte.h>
 #include <gsl/gsl_monte_vegas.h>
@@ -18,7 +19,7 @@
 
 using namespace svFitMEM;
 
-enum { kTF_met, kTF_lepTau, kTF_hadTau };
+enum { kTF_met, kTF_lepTauDecay, kTF_hadTauDecay, kTF_hadTauEn };
 
 enum { kElectron, kMuon };
 
@@ -36,7 +37,7 @@ double compIntegral(double (*g)(double* x, size_t dim, void* params), int numDim
   double integral = 0.;
   integralErr = 0.;
   vegasWorkspace->stage = 0;
-  const int numCallsGridOpt = 100000;
+  const int numCallsGridOpt = 100000; 
   gsl_monte_vegas_integrate(vegasIntegrand, xl, xu, numDimensions, numCallsGridOpt, vegasRnd, vegasWorkspace, &integral, &integralErr);
   integral = 0.;
   integralErr = 0.;
@@ -64,7 +65,7 @@ double gTF_met(double* x, size_t dim, void* params_void)
   return prob;
 }
 
-double gTF_hadTau(double* x, size_t dim, void* params_void)
+double gTF_hadTauDecay(double* x, size_t dim, void* params_void)
 {
   double* params = (double*)params_void;
   double tauP = params[0];
@@ -99,7 +100,7 @@ double GammaLep(int lepType)
   return GammaLep;
 }
 
-double gTF_lepTau(double* x, size_t dim, void* params_void)
+double gTF_lepTauDecay(double* x, size_t dim, void* params_void)
 {
   double* params = (double*)params_void;
   double tauP = params[0];
@@ -134,6 +135,26 @@ double gTF_lepTau(double* x, size_t dim, void* params_void)
   return prob;
 }
 
+double gTF_hadTauEn(double* x, size_t dim, void* params_void)
+{
+  static CrystalBall* gCrystalBall = 0;
+  if ( !gCrystalBall ) {
+    gCrystalBall = new CrystalBall();
+  }
+  double* params = (double*)params_void;
+  double genTauPt = params[0];
+  double genTauEta = params[1];
+  int decayMode = TMath::Nint(params[2]);
+  gCrystalBall->setDecayMode(decayMode);
+  double rec_div_genTauPt = x[0];
+  double recTauPt = rec_div_genTauPt*genTauPt;
+  double prob = (*gCrystalBall)(recTauPt, genTauPt, genTauEta);
+  //static int idxCall = 0;
+  //std::cout << "<gTF_hadTauEn (call #" << idxCall << "): prob = " << prob << std::endl;
+  //++idxCall;
+  return prob;
+}
+
 void fillWithOverFlow(TH1* histogram, double x, double weight = 1.)
 {
   TAxis* xAxis = histogram->GetXaxis();
@@ -145,17 +166,18 @@ void fillWithOverFlow(TH1* histogram, double x, double weight = 1.)
   histogram->Fill(xBin, weight);
 }
 
-
 int main(int argc, char* argv[]) 
 {
   std::vector<int> checksToRun;
-  checksToRun.push_back(kTF_met);
-  checksToRun.push_back(kTF_lepTau);
-  checksToRun.push_back(kTF_hadTau);
+  //checksToRun.push_back(kTF_met);
+  //checksToRun.push_back(kTF_lepTauDecay);
+  //checksToRun.push_back(kTF_hadTauDecay);
+  checksToRun.push_back(kTF_hadTauEn);
 
   TH1* norm_met = new TH1D("norm_met", "norm_met", 10000, 0., 10.);
-  TH1* norm_lepTau = new TH1D("norm_lepTau", "norm_lepTau", 10000, 0., 10.);
-  TH1* norm_hadTau = new TH1D("norm_hadTau", "norm_hadTau", 10000, 0., 10.);
+  TH1* norm_lepTauDecay = new TH1D("norm_lepTauDecay", "norm_lepTauDecay", 10000, 0., 10.);
+  TH1* norm_hadTauDecay = new TH1D("norm_hadTauDecay", "norm_hadTauDecay", 10000, 0., 10.);
+  TH1* norm_hadTauEn = new TH1D("norm_hadTauEn", "norm_hadTauEn", 10000, 0., 10.);
 
   int idxCheck = 0;
   for ( std::vector<int>::const_iterator checkToRun = checksToRun.begin();
@@ -210,7 +232,7 @@ int main(int argc, char* argv[])
 	std::cout << " toy #" << idxToy << ": normalization = " << normalization << " +/- " << normalizationErr 
 		  << " (expected = 1.0, ratio = " << normalization << " +/- " << normalizationErr << ")" << std::endl;
       }
-    } else if ( (*checkToRun) == kTF_lepTau ) {
+    } else if ( (*checkToRun) == kTF_lepTauDecay ) {
       std::cout << "checking transfer function for leptonic tau decays..." << std::endl;
       int numToys = 1000;
       TRandom3 rnd;
@@ -240,18 +262,18 @@ int main(int argc, char* argv[])
 	params[2] = tauPhi;
 	params[3] = visMass;
 	double normalizationErr;
-	double normalization = compIntegral(&gTF_lepTau, 3, xl, xu, params, normalizationErr);
+	double normalization = compIntegral(&gTF_lepTauDecay, 3, xl, xu, params, normalizationErr);
 	double tauEn = TMath::Sqrt(square(tauP) + tauLeptonMass2);
 	double gamma = tauEn/tauLeptonMass;
 	double GammaTauToLep_div_gamma = GammaLep(lepType)/gamma;
 	delete [] xl;
 	delete [] xu;
 	delete [] params;
-	fillWithOverFlow(norm_lepTau, normalization/GammaTauToLep_div_gamma);
+	fillWithOverFlow(norm_lepTauDecay, normalization/GammaTauToLep_div_gamma);
 	std::cout << " toy #" << idxToy << ": normalization = " << normalization << " +/- " << normalizationErr 
 		  << " (expected = " << GammaTauToLep_div_gamma << ", ratio = " << (normalization/GammaTauToLep_div_gamma) << " +/- " << (normalizationErr/GammaTauToLep_div_gamma) << ")" << std::endl;
       }
-    } else if ( (*checkToRun) == kTF_hadTau ) {
+    } else if ( (*checkToRun) == kTF_hadTauDecay ) {
       std::cout << "checking transfer function for hadronic tau decays..." << std::endl;
       int numToys = 1000;
       TRandom3 rnd;
@@ -278,16 +300,49 @@ int main(int argc, char* argv[])
 	params[2] = tauPhi;
 	params[3] = visMass;
 	double normalizationErr;
-	double normalization = compIntegral(&gTF_hadTau, 2, xl, xu, params, normalizationErr);
+	double normalization = compIntegral(&gTF_hadTauDecay, 2, xl, xu, params, normalizationErr);
 	double tauEn = TMath::Sqrt(square(tauP) + tauLeptonMass2);
 	double gamma = tauEn/tauLeptonMass;
 	double GammaTauToHad_div_gamma = GammaTauToHad/gamma;
 	delete [] xl;
 	delete [] xu;
 	delete [] params;
-	fillWithOverFlow(norm_hadTau, normalization/GammaTauToHad_div_gamma);
+	fillWithOverFlow(norm_hadTauDecay, normalization/GammaTauToHad_div_gamma);
 	std::cout << " toy #" << idxToy << ": normalization = " << normalization << " +/- " << normalizationErr 
 		  << " (expected = " << GammaTauToHad_div_gamma << ", ratio = " << (normalization/GammaTauToHad_div_gamma) << " +/- " << (normalizationErr/GammaTauToHad_div_gamma) << ")" << std::endl;
+      }
+    } else if ( (*checkToRun) == kTF_hadTauEn ) {
+      std::cout << "checking transfer function for hadronic tau energy reconstruction..." << std::endl;
+      int numToys = 1000;
+      TRandom3 rnd;
+      for ( int idxToy = 0; idxToy < numToys; ++idxToy ) {
+	double tauPt = rnd.Uniform(20., 100.);
+	double tauEta = rnd.Uniform(-2.3, +2.3);
+	double tauPhi = rnd.Uniform(-TMath::Pi(), +TMath::Pi());
+	std::cout << "tau: Pt = " << tauPt << ", eta = " << tauEta << ", phi = " << tauPhi << std::endl;
+	double visMass = rnd.Uniform(chargedPionMass, 1.5);
+	std::cout << "visMass = " << visMass << std::endl;
+	int decayMode = -1;
+	while ( !(decayMode == 0 || decayMode == 1 || decayMode == 2 || decayMode == 10) ) {
+	  decayMode = TMath::Nint(rnd.Uniform(-0.5, +10.5));
+	}
+	std::cout << "decayMode = " << decayMode << std::endl;
+	double* xl = new double[1];
+	double* xu = new double[1];
+	xl[0] = 0.;
+	xu[0] = 2.;
+	double* params = new double[3];
+	params[0] = tauPt;
+	params[1] = tauEta;
+	params[2] = decayMode;
+	double normalizationErr;
+	double normalization = compIntegral(&gTF_hadTauEn, 1, xl, xu, params, normalizationErr);
+	delete [] xl;
+	delete [] xu;
+	delete [] params;
+	fillWithOverFlow(norm_hadTauEn, normalization);
+	std::cout << " toy #" << idxToy << ": normalization = " << normalization << " +/- " << normalizationErr 
+		  << " (expected = 1.0, ratio = " << normalization << " +/- " << normalizationErr << ")" << std::endl;
       }
     } else {
       std::cerr << "Check of type = " << (*checkToRun) << " is not defined !!" << std::endl;
@@ -298,8 +353,9 @@ int main(int argc, char* argv[])
 
   TFile* outputFile = new TFile("testTFNormalization.root", "RECREATE");
   norm_met->Write();
-  norm_lepTau->Write();
-  norm_hadTau->Write();
+  norm_lepTauDecay->Write();
+  norm_hadTauDecay->Write();
+  norm_hadTauEn->Write();
   delete outputFile;
 
   return 0;

@@ -17,21 +17,22 @@ double roundToNdigits(double x, int n)
   //std::cout << "<roundToNdigits>: x = " << x << ", x_rounded = " << x_rounded << std::endl;
   return x_rounded;
 }
-
-TGraphErrors* makeGraph(const std::string& graphName, const std::vector<double>& xGraph, const std::vector<double>& xErrGraph, const std::vector<double>& yGraph, const std::vector<double>& yErrGraph)
+  
+TGraphErrors* makeGraph(const std::string& graphName, const std::vector<GraphPoint>& graphPoints)
 {
   //std::cout << "<makeGraph>:" << std::endl;
-  size_t numPoints = xGraph.size();
+  size_t numPoints = graphPoints.size();
   //std::cout << " numPoints = " << numPoints << std::endl;
   TGraphErrors* graph = new TGraphErrors(numPoints);
   graph->SetName(graphName.data());
   for ( size_t iPoint = 0; iPoint < numPoints; ++iPoint ) {
-    graph->SetPoint(iPoint, xGraph[iPoint], yGraph[iPoint]);
-    graph->SetPointError(iPoint, xErrGraph[iPoint], yErrGraph[iPoint]);
+    const GraphPoint& graphPoint = graphPoints[iPoint];
+    graph->SetPoint(iPoint, graphPoint.x_, graphPoint.y_);
+    graph->SetPointError(iPoint, graphPoint.xErr_, graphPoint.yErr_);
   }
   return graph;
 }
-
+  
 void extractResult(TGraphErrors* graph, double& mass, double& massErr, double& Lmax, int verbosity)
 {
   // determine range of mTest values that are within ~2 sigma interval within maximum of likelihood function
@@ -59,10 +60,7 @@ void extractResult(TGraphErrors* graph, double& mass, double& massErr, double& L
   
   // fit log-likelihood function within ~2 sigma interval within maximum 
   // with parabola
-  std::vector<double> xGraph_forFit;
-  std::vector<double> xErrGraph_forFit;
-  std::vector<double> yGraph_forFit;
-  std::vector<double> yErrGraph_forFit;
+  std::vector<GraphPoint> graphPoints_forFit;
   double xMin_fit = 1.e+6;
   double xMax_fit = 0.;
   for ( int iPoint = 0; iPoint < graph->GetN(); ++iPoint ) {
@@ -72,17 +70,19 @@ void extractResult(TGraphErrors* graph, double& mass, double& massErr, double& L
     double yErr = graph->GetErrorY(iPoint);
     //std::cout << "point #" << iPoint << ": x = " << x << " +/- " << xErr << ", y = " << y << " +/- " << yErr << std::endl;
     if ( y > (1.e-1*y_Lmax) && TMath::Abs(iPoint - idxPoint_Lmax) <= 5 ) {
-      xGraph_forFit.push_back(x);
-      xErrGraph_forFit.push_back(xErr);
+      GraphPoint graphPoint;
+      graphPoint.x_ = x;
+      graphPoint.xErr_ = xErr;
       if ( (x - xErr) < xMin_fit ) xMin_fit = x - xErr; 
       if ( (x + xErr) > xMax_fit ) xMax_fit = x + xErr; 
-      yGraph_forFit.push_back(-TMath::Log(y));
-      yErrGraph_forFit.push_back(yErr/y);
+      graphPoint.y_ = -TMath::Log(y);
+      graphPoint.yErr_ = yErr/y;
+      graphPoints_forFit.push_back(graphPoint);
     }
   }
   //std::cout << "fit: xMin = " << xMin_fit << ", xMax = " << xMax_fit << std::endl;
 
-  TGraphErrors* likelihoodGraph_forFit = makeGraph("svFitLikelihoodGraph_forFit", xGraph_forFit, xErrGraph_forFit, yGraph_forFit, yErrGraph_forFit);
+  TGraphErrors* likelihoodGraph_forFit = makeGraph("svFitLikelihoodGraph_forFit", graphPoints_forFit);
   int numPoints = likelihoodGraph_forFit->GetN();
   bool useFit = false;
   if ( numPoints >= 3 ) {  

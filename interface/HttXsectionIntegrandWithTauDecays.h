@@ -9,6 +9,12 @@
 
 #include <TMatrixD.h>
 
+class acceptanceBaseType
+{
+ public:
+  virtual double operator()(const svFitMEM::LorentzVector&, const svFitMEM::LorentzVector&, double, double) const = 0;
+};
+
 class HttXsectionIntegrandWithTauDecays 
 {
  public:
@@ -19,10 +25,10 @@ class HttXsectionIntegrandWithTauDecays
   void setBR(double br) { me_lit_.setBR(br); }
 
   /// enable/disable acceptance cuts
-  void enableAcceptanceCuts(double (*acceptance)(const svFitMEM::LorentzVector&, const svFitMEM::LorentzVector&, double, double))
+  void enableAcceptanceCuts(const acceptanceBaseType& acceptance)
   {
     //std::cout << "<HttXsectionIntegrandWithTauDecays::enableAcceptanceCuts>: acceptance = " << &acceptance << std::endl;
-    acceptance_ = acceptance;      
+    acceptance_ = &acceptance;      
   }
   void disableAcceptanceCuts()
   {
@@ -144,7 +150,7 @@ class HttXsectionIntegrandWithTauDecays
   mutable vector<double*> madgraphMomenta_;
   
   /// acceptance function
-  double (*acceptance_)(const svFitMEM::LorentzVector&, const svFitMEM::LorentzVector&, double, double);
+  const acceptanceBaseType* acceptance_;
 
   /// data-members to record minimum and maximum of integrand
   mutable double minIntegrand_;
