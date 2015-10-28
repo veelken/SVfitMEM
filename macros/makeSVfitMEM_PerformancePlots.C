@@ -607,19 +607,20 @@ void makeSVfitMEM_PerformancePlots()
   //xSection_times_Acc.push_back("xSection_times_Acc");
 
   std::map<std::string, std::string> branchName_svFitMEM; // key = xSection_times_Acc
-  branchName_svFitMEM["none"]               = "svfitMEMunorrMass";
+  branchName_svFitMEM["none"]               = "svfitMEMuncorrMass";
   branchName_svFitMEM["xSection"]           = "svfitMEMxSectionCorrMass";
   branchName_svFitMEM["xSection_times_Acc"] = "svfitMEMxSection_times_AccCorrMass";
   
   std::vector<int> logM;
-  //logM.push_back(0);
+  logM.push_back(0);
   logM.push_back(1);
   logM.push_back(2);
   logM.push_back(3);
   logM.push_back(5);
+  logM.push_back(6);
   logM.push_back(7);
   logM.push_back(10);
-  //logM.push_back(15);
+  logM.push_back(15);
   logM.push_back(20);
   logM.push_back(50);
   logM.push_back(100);
@@ -657,10 +658,14 @@ void makeSVfitMEM_PerformancePlots()
 
       for ( std::vector<int>::const_iterator logM_i = logM.begin();
 	    logM_i != logM.end(); ++logM_i ) {
+	
+	if ( (*xSection_times_Acc_i) == "none" && (*logM_i) != 0 ) continue;
+
 	for ( std::vector<int>::const_iterator numCalls_i = numCalls.begin();
 	      numCalls_i != numCalls.end(); ++numCalls_i ) {
 	  
-	  if ( (*numCalls_i) != 100000 && (*logM_i) != 5 ) continue;
+	  if ( (*numCalls_i) != 100000 && (*logM_i) != 5 && !((*numCalls_i) == 20000 && (*logM_i) == 6) ) continue;
+	  if ( (*numCalls_i) !=  20000 && (*logM_i) == 6 ) continue;
 
 	  std::vector<TFile*> inputFilesToClose2d;
 
@@ -872,6 +877,16 @@ void makeSVfitMEM_PerformancePlots()
 
       std::cout << "processing sample = " << (*sample) << ", xSection_times_Acc = " << (*xSection_times_Acc_i) << " for different values of logM..." << std::endl;
 
+      std::string inputFileName_vamp_logM0 = std::string(inputFilePath).append(Form(
+        "%s/addLogM0/vamp/maxObjFunctionCalls100k/%s/H2TauTauTreeProducerTauTau_addSVfitMEM_all.root", 
+        xSection_times_Acc_i->data(), sample->data()));
+      TTree* tree_vamp_logM0 = loadTree(inputFileName_vamp_logM0, inputFilesToClose1d, treeName);
+      std::vector<double> svFitMEM_vamp_logM0 = extractVarFromTree(tree_vamp_logM0, branchName_svFitMEM_i, mH_i);
+      std::string histogramName_svFitMEM_vamp_logM0 = Form("histogram_svFitMEM_vamp_logM0_%s_%s", sample->data(), xSection_times_Acc_i->data());
+      TH1* histogram_svFitMEM_vamp_logM0 = new TH1D(histogramName_svFitMEM_vamp_logM0.data(), histogramName_svFitMEM_vamp_logM0.data(), 60, 0., 3.*mH_i);
+      fillHistogram1d(histogram_svFitMEM_vamp_logM0, svFitMEM_vamp_logM0);
+      normalizeHistogram(histogram_svFitMEM_vamp_logM0);
+
       std::string inputFileName_vamp_logM1 = std::string(inputFilePath).append(Form(
         "%s/addLogM1/vamp/maxObjFunctionCalls100k/%s/H2TauTauTreeProducerTauTau_addSVfitMEM_all.root", 
         xSection_times_Acc_i->data(), sample->data()));
@@ -912,6 +927,16 @@ void makeSVfitMEM_PerformancePlots()
       fillHistogram1d(histogram_svFitMEM_vamp_logM5, svFitMEM_vamp_logM5);
       normalizeHistogram(histogram_svFitMEM_vamp_logM5);
 
+      std::string inputFileName_vamp_logM6 = std::string(inputFilePath).append(Form(
+        "%s/addLogM6/vamp/maxObjFunctionCalls20k/nom/%s/H2TauTauTreeProducerTauTau_addSVfitMEM_all.root", 
+        xSection_times_Acc_i->data(), sample->data()));
+      TTree* tree_vamp_logM6 = loadTree(inputFileName_vamp_logM6, inputFilesToClose1d, treeName);
+      std::vector<double> svFitMEM_vamp_logM6 = extractVarFromTree(tree_vamp_logM6, branchName_svFitMEM_i, mH_i);
+      std::string histogramName_svFitMEM_vamp_logM6 = Form("histogram_svFitMEM_vamp_logM6_%s_%s", sample->data(), xSection_times_Acc_i->data());
+      TH1* histogram_svFitMEM_vamp_logM6 = new TH1D(histogramName_svFitMEM_vamp_logM6.data(), histogramName_svFitMEM_vamp_logM6.data(), 60, 0., 3.*mH_i);
+      fillHistogram1d(histogram_svFitMEM_vamp_logM6, svFitMEM_vamp_logM6);
+      normalizeHistogram(histogram_svFitMEM_vamp_logM6);
+
       std::string inputFileName_vamp_logM7 = std::string(inputFilePath).append(Form(
         "%s/addLogM7/vamp/maxObjFunctionCalls100k/%s/H2TauTauTreeProducerTauTau_addSVfitMEM_all.root", 
         xSection_times_Acc_i->data(), sample->data()));
@@ -931,6 +956,16 @@ void makeSVfitMEM_PerformancePlots()
       TH1* histogram_svFitMEM_vamp_logM10 = new TH1D(histogramName_svFitMEM_vamp_logM10.data(), histogramName_svFitMEM_vamp_logM10.data(), 60, 0., 3.*mH_i);
       fillHistogram1d(histogram_svFitMEM_vamp_logM10, svFitMEM_vamp_logM10);
       normalizeHistogram(histogram_svFitMEM_vamp_logM10);
+
+      std::string inputFileName_vamp_logM15 = std::string(inputFilePath).append(Form(
+        "%s/addLogM15/vamp/maxObjFunctionCalls100k/%s/H2TauTauTreeProducerTauTau_addSVfitMEM_all.root", 
+        xSection_times_Acc_i->data(), sample->data()));
+      TTree* tree_vamp_logM15 = loadTree(inputFileName_vamp_logM15, inputFilesToClose1d, treeName);
+      std::vector<double> svFitMEM_vamp_logM15 = extractVarFromTree(tree_vamp_logM15, branchName_svFitMEM_i, mH_i);
+      std::string histogramName_svFitMEM_vamp_logM15 = Form("histogram_svFitMEM_vamp_logM15_%s_%s", sample->data(), xSection_times_Acc_i->data());
+      TH1* histogram_svFitMEM_vamp_logM15 = new TH1D(histogramName_svFitMEM_vamp_logM15.data(), histogramName_svFitMEM_vamp_logM15.data(), 60, 0., 3.*mH_i);
+      fillHistogram1d(histogram_svFitMEM_vamp_logM15, svFitMEM_vamp_logM15);
+      normalizeHistogram(histogram_svFitMEM_vamp_logM15);
 
       std::string inputFileName_vamp_logM20 = std::string(inputFilePath).append(Form(
         "%s/addLogM20/vamp/maxObjFunctionCalls100k/%s/H2TauTauTreeProducerTauTau_addSVfitMEM_all.root", 
@@ -995,8 +1030,8 @@ void makeSVfitMEM_PerformancePlots()
 	histogram_caMass, "m_{CA}",
 	histogram_mTtotal, "m_{T}^{total}",
 	histogram_visMass, "m_{vis}",
+	histogram_svFitMEM_vamp_logM0, "VAMP,0*logM",
 	histogram_svFitMEM_vamp_logM1, "VAMP,1*logM",
-	histogram_svFitMEM_vamp_logM2, "VAMP,2*logM",
 	"m [GeV]", 1.10,
 	true, 1.e-5, 19.9e0, "1/dm [1/GeV]", 1.30,
 	0.24, 0.69,
@@ -1011,8 +1046,8 @@ void makeSVfitMEM_PerformancePlots()
 	histogram_caMass, "m_{CA}",
 	histogram_mTtotal, "m_{T}^{total}",
 	histogram_visMass, "m_{vis}",
+	histogram_svFitMEM_vamp_logM2, "VAMP,2*logM",
 	histogram_svFitMEM_vamp_logM3, "VAMP,3*logM",
-	histogram_svFitMEM_vamp_logM5, "VAMP,5*logM",
 	"m [GeV]", 1.10,
 	true, 1.e-5, 19.9e0, "1/dm [1/GeV]", 1.30,
 	0.24, 0.69,
@@ -1027,8 +1062,8 @@ void makeSVfitMEM_PerformancePlots()
 	histogram_caMass, "m_{CA}",
 	histogram_mTtotal, "m_{T}^{total}",
 	histogram_visMass, "m_{vis}",
-	histogram_svFitMEM_vamp_logM7, "VAMP,7*logM",
-	histogram_svFitMEM_vamp_logM10, "VAMP,10*logM",
+	histogram_svFitMEM_vamp_logM5, "VAMP,5*logM",
+	histogram_svFitMEM_vamp_logM6, "VAMP,6*logM",
 	"m [GeV]", 1.10,
 	true, 1.e-5, 19.9e0, "1/dm [1/GeV]", 1.30,
 	0.24, 0.69,
@@ -1043,23 +1078,57 @@ void makeSVfitMEM_PerformancePlots()
 	histogram_caMass, "m_{CA}",
 	histogram_mTtotal, "m_{T}^{total}",
 	histogram_visMass, "m_{vis}",
-	histogram_svFitMEM_vamp_logM20, "VAMP,20*logM",
-	histogram_svFitMEM_vamp_logM50, "VAMP,50*logM",
+	histogram_svFitMEM_vamp_logM7, "VAMP,7*logM",
+	histogram_svFitMEM_vamp_logM10, "VAMP,10*logM",
 	"m [GeV]", 1.10,
 	true, 1.e-5, 19.9e0, "1/dm [1/GeV]", 1.30,
 	0.24, 0.69,
 	outputFileName_logM_4);
+      
+      std::string outputFileName_logM_5 = Form(
+	"plots/makeSVfitMEM_PerformancePlots_svFitMEM_numCalls100k_vamp_%s_%s_logM_5.png", 
+	sample->data(), xSection_times_Acc_i->data());
+      showHistograms1d(
+        800, 900,
+	histogram_svFit, "SVfit",
+	histogram_caMass, "m_{CA}",
+	histogram_mTtotal, "m_{T}^{total}",
+	histogram_visMass, "m_{vis}",
+	histogram_svFitMEM_vamp_logM15, "VAMP,15*logM",
+	histogram_svFitMEM_vamp_logM20, "VAMP,20*logM",
+	"m [GeV]", 1.10,
+	true, 1.e-5, 19.9e0, "1/dm [1/GeV]", 1.30,
+	0.24, 0.69,
+	outputFileName_logM_5);
+
+      std::string outputFileName_logM_6 = Form(
+	"plots/makeSVfitMEM_PerformancePlots_svFitMEM_numCalls100k_vamp_%s_%s_logM_6.png", 
+	sample->data(), xSection_times_Acc_i->data());
+      showHistograms1d(
+        800, 900,
+	histogram_svFit, "SVfit",
+	histogram_caMass, "m_{CA}",
+	histogram_mTtotal, "m_{T}^{total}",
+	histogram_visMass, "m_{vis}",
+	histogram_svFitMEM_vamp_logM50, "VAMP,50*logM",
+	histogram_svFitMEM_vamp_logM100, "VAMP,100*logM",
+	"m [GeV]", 1.10,
+	true, 1.e-5, 19.9e0, "1/dm [1/GeV]", 1.30,
+	0.24, 0.69,
+	outputFileName_logM_6);
 
       delete histogram_svFit;
       delete histogram_mTtotal;
       delete histogram_visMass;
       delete histogram_caMass;
+      delete histogram_svFitMEM_vamp_logM0;
       delete histogram_svFitMEM_vamp_logM1;
       delete histogram_svFitMEM_vamp_logM2;
       delete histogram_svFitMEM_vamp_logM3;
       delete histogram_svFitMEM_vamp_logM5;
       delete histogram_svFitMEM_vamp_logM7;
       delete histogram_svFitMEM_vamp_logM10;
+      delete histogram_svFitMEM_vamp_logM15;
       delete histogram_svFitMEM_vamp_logM20;
       delete histogram_svFitMEM_vamp_logM50;
       delete histogram_svFitMEM_vamp_logM100;
@@ -1069,6 +1138,104 @@ void makeSVfitMEM_PerformancePlots()
 	std::cout << "closing inputFile = " << (*inputFile)->GetName() << std::endl;
 	delete (*inputFile);
       }
+    }
+  }
+  
+  for ( std::vector<std::string>::const_iterator sample = samplesToAnalyze.begin();
+	sample != samplesToAnalyze.end(); ++sample ) {
+    
+    assert(mH.find(*sample) != mH.end());
+    double mH_i = mH[*sample];
+    
+    std::cout << "processing sample = " << (*sample) << " for different values of xSection_times_Acc..." << std::endl;
+    
+    std::vector<TFile*> inputFilesToClose1d;
+    
+    assert(branchName_svFitMEM.find("xSection") != branchName_svFitMEM.end());
+    std::string branchName_svFitMEM_xSection = branchName_svFitMEM["xSection"];
+
+    std::string inputFileName_xSection_vamp_logM0 = std::string(inputFilePath).append(Form(
+      "%s/addLogM0/vamp/maxObjFunctionCalls100k/%s/H2TauTauTreeProducerTauTau_addSVfitMEM_all.root", 
+      "xSection", sample->data()));
+    TTree* tree_xSection_vamp_logM0 = loadTree(inputFileName_xSection_vamp_logM0, inputFilesToClose1d, treeName);
+    std::vector<double> svFitMEM_xSection_vamp_logM0 = extractVarFromTree(tree_xSection_vamp_logM0, branchName_svFitMEM_xSection, mH_i);
+    std::string histogramName_svFitMEM_xSection_vamp_logM0 = Form("histogram_svFitMEM_xSection_vamp_logM0_%s_%s", sample->data(), "xSection");
+    TH1* histogram_svFitMEM_xSection_vamp_logM0 = new TH1D(histogramName_svFitMEM_xSection_vamp_logM0.data(), histogramName_svFitMEM_xSection_vamp_logM0.data(), 60, 0., 3.*mH_i);
+    fillHistogram1d(histogram_svFitMEM_xSection_vamp_logM0, svFitMEM_xSection_vamp_logM0);
+    normalizeHistogram(histogram_svFitMEM_xSection_vamp_logM0);
+
+    assert(branchName_svFitMEM.find("none") != branchName_svFitMEM.end());
+    std::string branchName_svFitMEM_none = branchName_svFitMEM["none"];
+
+    std::string inputFileName_none_vamp_logM0 = std::string(inputFilePath).append(Form(
+      "%s/addLogM0/vamp/maxObjFunctionCalls100k/%s/H2TauTauTreeProducerTauTau_addSVfitMEM_all.root", 
+      "none", sample->data()));
+    TTree* tree_none_vamp_logM0 = loadTree(inputFileName_none_vamp_logM0, inputFilesToClose1d, treeName);
+    std::vector<double> svFitMEM_none_vamp_logM0 = extractVarFromTree(tree_none_vamp_logM0, branchName_svFitMEM_none, mH_i);
+    std::string histogramName_svFitMEM_none_vamp_logM0 = Form("histogram_svFitMEM_none_vamp_logM0_%s_%s", sample->data(), "none");
+    TH1* histogram_svFitMEM_none_vamp_logM0 = new TH1D(histogramName_svFitMEM_none_vamp_logM0.data(), histogramName_svFitMEM_none_vamp_logM0.data(), 60, 0., 3.*mH_i);
+    fillHistogram1d(histogram_svFitMEM_none_vamp_logM0, svFitMEM_none_vamp_logM0);
+    normalizeHistogram(histogram_svFitMEM_none_vamp_logM0);
+
+    delete tree_xSection_vamp_logM0;
+    tree_xSection_vamp_logM0 = loadTree(inputFileName_xSection_vamp_logM0, inputFilesToClose1d, treeName);
+    std::vector<double> svFit = extractVarFromTree(tree_xSection_vamp_logM0, "svfitMass", mH_i);
+    std::string histogramName_svFit = Form("histogram_svFit_%s_%s", sample->data(), "xSection");
+    TH1* histogram_svFit = new TH1D(histogramName_svFit.data(), histogramName_svFit.data(), 60, 0., 3.*mH_i);
+    fillHistogram1d(histogram_svFit, svFit);
+    normalizeHistogram(histogram_svFit);
+
+    delete tree_xSection_vamp_logM0;
+    tree_xSection_vamp_logM0 = loadTree(inputFileName_xSection_vamp_logM0, inputFilesToClose1d, treeName);
+    std::vector<double> mTtotal = extractVarFromTree(tree_xSection_vamp_logM0, "mTtotal", mH_i);
+    std::string histogramName_mTtotal = Form("histogram_mTtotal_%s_%s", sample->data(), "xSection");
+    TH1* histogram_mTtotal = new TH1D(histogramName_mTtotal.data(), histogramName_mTtotal.data(), 60, 0., 3.*mH_i);
+    fillHistogram1d(histogram_mTtotal, mTtotal);
+    normalizeHistogram(histogram_mTtotal);
+    
+    delete tree_xSection_vamp_logM0;
+    tree_xSection_vamp_logM0 = loadTree(inputFileName_xSection_vamp_logM0, inputFilesToClose1d, treeName);
+    std::vector<double> visMass = extractVarFromTree(tree_xSection_vamp_logM0, "visMass", mH_i);
+    std::string histogramName_visMass = Form("histogram_visMass_%s_%s", sample->data(), "xSection");
+    TH1* histogram_visMass = new TH1D(histogramName_visMass.data(), histogramName_visMass.data(), 60, 0., 3.*mH_i);
+    fillHistogram1d(histogram_visMass, visMass);
+    normalizeHistogram(histogram_visMass);
+    
+    delete tree_xSection_vamp_logM0;
+    tree_xSection_vamp_logM0 = loadTree(inputFileName_xSection_vamp_logM0, inputFilesToClose1d, treeName);
+    std::vector<double> caMass = extractCollinearApproxMassFromTree(tree_xSection_vamp_logM0, mH_i, 0);
+    std::string histogramName_caMass = Form("histogram_caMass_%s_%s", sample->data(), "xSection");
+    TH1* histogram_caMass = new TH1D(histogramName_caMass.data(), histogramName_caMass.data(), 60, 0., 3.*mH_i);
+    fillHistogram1d(histogram_caMass, caMass);
+    normalizeHistogram(histogram_caMass);
+
+    std::string outputFileName_xSection_times_Acc = Form(
+      "plots/makeSVfitMEM_PerformancePlots_svFitMEM_numCalls100k_xSection_vs_none_vamp_%s.png", 
+      sample->data());
+    showHistograms1d(
+      800, 900,
+      histogram_svFit, "SVfit",
+      histogram_caMass, "m_{CA}",
+      histogram_mTtotal, "m_{T}^{total}",
+      histogram_visMass, "m_{vis}",
+      histogram_svFitMEM_xSection_vamp_logM0, "'xSection',0*logM",
+      histogram_svFitMEM_none_vamp_logM0, "'none',0*logM",
+      "m [GeV]", 1.10,
+      true, 1.e-5, 19.9e0, "1/dm [1/GeV]", 1.30,
+      0.24, 0.69,
+      outputFileName_xSection_times_Acc);
+    
+    delete histogram_svFit;
+    delete histogram_mTtotal;
+    delete histogram_visMass;
+    delete histogram_caMass;
+    delete histogram_svFitMEM_xSection_vamp_logM0;
+    delete histogram_svFitMEM_none_vamp_logM0;
+
+    for ( std::vector<TFile*>::iterator inputFile = inputFilesToClose1d.begin();
+	  inputFile != inputFilesToClose1d.end(); ++inputFile ) {
+      std::cout << "closing inputFile = " << (*inputFile)->GetName() << std::endl;
+      delete (*inputFile);
     }
   }
   //-----------------------------------------------------------------------------

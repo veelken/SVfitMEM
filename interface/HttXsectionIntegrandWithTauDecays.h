@@ -15,7 +15,7 @@ class acceptanceBaseType
   virtual double operator()(const svFitMEM::LorentzVector&, const svFitMEM::LorentzVector&, double, double) const = 0;
 };
 
-class HttXsectionIntegrandWithTauDecays 
+class HttXsectionIntegrandWithTauDecays
 {
  public:
   HttXsectionIntegrandWithTauDecays(double, double, const std::string&, int, const std::string&, int);

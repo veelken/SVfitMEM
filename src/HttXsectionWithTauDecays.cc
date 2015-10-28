@@ -225,18 +225,18 @@ HttXsectionWithTauDecays::integrate(int tau1Type, int tau1DecayMode, double vis1
   xu_[0] = +1.0*0.5*mH_;
   xl_[1] = -1.0*0.5*mH_; // vis1Py
   xu_[1] = +1.0*0.5*mH_;
-  xl_[2] = -sqrtS_;      // vis1Pz 
-  xu_[2] = +sqrtS_;
+  xl_[2] = -TMath::Power(sqrtS_, 1./3.); // vis1Pz^1/3
+  xu_[2] = +TMath::Power(sqrtS_, 1./3.);
   xl_[3] = 0.;           // mVis^2
   xu_[3] = 2.*mH2_;
   //xl_[3] = -sqrtS_;      // vis2Pz 
   //xu_[3] = +sqrtS_;
   //-----------------------------------------------------------------------------
   if ( applyMEtTF_ ) {
-    xl_[6] = -100.;      // MET: recPx - genPx
-    xu_[6] = +100.;        
-    xl_[7] = -100.;      // MET: recPy - genPy
-    xu_[7] = +100.;  
+    xl_[4] = -100.;      // MET: recPx - genPx
+    xu_[4] = +100.;        
+    xl_[5] = -100.;      // MET: recPy - genPy
+    xu_[5] = +100.;  
   }
   xl_[idxLeg1_X] = 0.;
   xu_[idxLeg1_X] = 1.;

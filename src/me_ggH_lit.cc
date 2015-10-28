@@ -49,13 +49,14 @@ double me_ggH_lit::getMatrixElement() const
       std::cerr << "Error in <me_ggH_lit::getMatrixElement_woBWandBR>: Branching ratio for decay of Higgs into taus has not been initialized !!" << std::endl;
       assert(0);
     }
-    double meHtoTauTau_q2 = 2.*(tauLeptonMass2/v2)*q2_*(1. - 4.*tauLeptonMass2/q2_);    
+    //double meHtoTauTau_q2 = 2.*(tauLeptonMass2/v2)*q2_*(1. - 4.*tauLeptonMass2/q2_);    
+    double meHtoTauTau_q2 = 2.*(tauLeptonMass2/v2)*mH2_*(1. - 4.*tauLeptonMass2/mH2_);    
     me *= meHtoTauTau_q2;    
     if ( !applyNWA_ ) {
       me *= (one_over_Pi*GammaH_times_mH/(square(q2_ - mH2_) + square(GammaH_times_mH)));
     }
     double meHtoTauTau_mH = 2.*(tauLeptonMass2/v2)*mH2_*(1. - 4.*tauLeptonMass2/mH2_);   
-    double GammaHtoTauTau = meHtoTauTau_mH/(16.*TMath::Pi()*mH_);
+    double GammaHtoTauTau = meHtoTauTau_mH*TMath::Sqrt(1. - 4.*tauLeptonMass2/q2_)/(16.*TMath::Pi()*mH_);
     double GammaH_times_mH_fromBR = (GammaHtoTauTau/br_)*mH_;
     me /= (one_over_Pi*GammaH_times_mH_fromBR);
   } else {

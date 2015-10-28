@@ -444,8 +444,12 @@ SVfitIntegrand::Eval(const double* x) const
   double ditauMass = ditauP4.mass();
   //if ( !(ditauMass > 0.70*mTest_ && ditauMass < 1.30*mTest_) ) return 0.;
   //std::cout << "ditau: En = " << ditauEn << ", Pz = " << ditauPz << std::endl;
-  double xa = invSqrtS_*(ditauEn + ditauPz);
-  double xb = invSqrtS_*(ditauEn - ditauPz);   
+  // CV: assume hadronic recoil to have only transverse momentum and no longitudinal momentum
+  //double hadRecoilEn = ditauP4.pt();
+  double hadRecoilEn = 0.;
+  double hadRecoilPz = 0.;
+  double xa = invSqrtS_*(ditauEn + ditauPz + hadRecoilEn + hadRecoilPz);
+  double xb = invSqrtS_*(ditauEn - ditauPz + hadRecoilEn - hadRecoilPz); 
   //std::cout << "xa = " << xa << ", xb = " << xb << std::endl;
   if ( xa <= 0. || xa >= 1. ) return 0.;
   if ( xb <= 0. || xb >= 1. ) return 0.;
@@ -506,25 +510,29 @@ SVfitIntegrand::Eval(const double* x) const
   const double constFactor = 2.*conversionFactor/eigth(2.*TMath::Pi());
   double prob_PS_and_tauDecay = constFactor/s_;
   LorentzVector vis1P4_mem = ROOT::Math::VectorUtil::boost(vis1P4, boost); 
-  LorentzVector nu1P4_mem  = ROOT::Math::VectorUtil::boost(nu1P4, boost); 
+  //LorentzVector nu1P4_mem  = ROOT::Math::VectorUtil::boost(nu1P4, boost); 
   double x1_mem = vis1P4_mem.energy()/tau1P4_mem.energy();
   if ( !(x1_mem >= 1.e-5 && x1_mem <= 1.) ) return 0.;
   LorentzVector vis2P4_mem = ROOT::Math::VectorUtil::boost(vis2P4, boost); 
-  LorentzVector nu2P4_mem  = ROOT::Math::VectorUtil::boost(nu2P4, boost); 
+  //LorentzVector nu2P4_mem  = ROOT::Math::VectorUtil::boost(nu2P4, boost); 
   double x2_mem = vis2P4_mem.energy()/tau2P4_mem.energy();
   if ( !(x2_mem >= 1.e-5 && x2_mem <= 1.) ) return 0.;
   double prob_tauDecay_leg1 = 0.;
   if ( leg1isLep_ ) {
-    prob_tauDecay_leg1 = compPSfactor_tauToLepDecay(x1_mem, vis1P4_mem.E(), vis1P4_mem.P(), leg1Mass_, nu1P4_mem.E(), nu1P4_mem.P(), nu1Mass);
+    //prob_tauDecay_leg1 = compPSfactor_tauToLepDecay(x1_mem, vis1P4_mem.E(), vis1P4_mem.P(), leg1Mass_, nu1P4_mem.E(), nu1P4_mem.P(), nu1Mass);
+    prob_tauDecay_leg1 = compPSfactor_tauToLepDecay(x1, vis1P4.E(), vis1P4.P(), leg1Mass_, nu1P4.E(), nu1P4.P(), nu1Mass);
   } else {
-    prob_tauDecay_leg1 = compPSfactor_tauToHadDecay(x1_mem, vis1P4_mem.E(), vis1P4_mem.P(), leg1Mass_, nu1P4_mem.E(), nu1P4_mem.P());
+    //prob_tauDecay_leg1 = compPSfactor_tauToHadDecay(x1_mem, vis1P4_mem.E(), vis1P4_mem.P(), leg1Mass_, nu1P4_mem.E(), nu1P4_mem.P());
+    prob_tauDecay_leg1 = compPSfactor_tauToHadDecay(x1, vis1P4.E(), vis1P4.P(), leg1Mass_, nu1P4.E(), nu1P4.P());
   }  
   prob_PS_and_tauDecay *= prob_tauDecay_leg1;
   double prob_tauDecay_leg2 = 0.;
   if ( leg2isLep_ ) {
-    prob_tauDecay_leg2 = compPSfactor_tauToLepDecay(x2_mem, vis2P4_mem.E(), vis2P4_mem.P(), leg2Mass_, nu2P4_mem.E(), nu2P4_mem.P(), nu2Mass);
+    //prob_tauDecay_leg2 = compPSfactor_tauToLepDecay(x2_mem, vis2P4_mem.E(), vis2P4_mem.P(), leg2Mass_, nu2P4_mem.E(), nu2P4_mem.P(), nu2Mass);
+    prob_tauDecay_leg2 = compPSfactor_tauToLepDecay(x2, vis2P4.E(), vis2P4.P(), leg2Mass_, nu2P4.E(), nu2P4.P(), nu2Mass);
   } else {
-    prob_tauDecay_leg2 = compPSfactor_tauToHadDecay(x2_mem, vis2P4_mem.E(), vis2P4_mem.P(), leg2Mass_, nu2P4_mem.E(), nu2P4_mem.P());
+    //prob_tauDecay_leg2 = compPSfactor_tauToHadDecay(x2_mem, vis2P4_mem.E(), vis2P4_mem.P(), leg2Mass_, nu2P4_mem.E(), nu2P4_mem.P());
+    prob_tauDecay_leg2 = compPSfactor_tauToHadDecay(x2, vis2P4.E(), vis2P4.P(), leg2Mass_, nu2P4.E(), nu2P4.P());
   }
   prob_PS_and_tauDecay *= prob_tauDecay_leg2;
   // CV: multiply matrix element by factor (Pi/(mTau GammaTau))^2 from Luca's write-up

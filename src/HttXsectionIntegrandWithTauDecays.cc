@@ -62,7 +62,7 @@ HttXsectionIntegrandWithTauDecays::HttXsectionIntegrandWithTauDecays(double sqrt
     me_madgraph_.initProc(madgraphFileName);
     me_madgraph_isInitialized_ = true;
   } else if ( mode == kMadgraph ) {
-    std::cerr << "Error in <HttXsectionIntegrandStableTaus>: No param.dat file for Madgraph given !!" << std::endl;
+    std::cerr << "Error in <HttXsectionIntegrandWithTauDecays>: No param.dat file for Madgraph given !!" << std::endl;
     assert(0);
   }
   if ( mode_ == kMadgraph ) {
@@ -309,7 +309,7 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   // compute four-vector of visible decay products for first tau
   double vis1Px = visPtShift1*x[0];
   double vis1Py = visPtShift1*x[1];
-  double vis1Pz = visPtShift1*x[2];
+  double vis1Pz = visPtShift1*TMath::Power(x[2], 3.);
   double vis1En = TMath::Sqrt(square(vis1Px) + square(vis1Py) + square(vis1Pz) + leg1Mass2_);
   LorentzVector vis1P4(vis1Px, vis1Py, vis1Pz, vis1En);
   double vis1P = vis1P4.P();
@@ -331,7 +331,7 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   // compute four-vector of visible decay products for second tau
   assert(idxLeg1_X_ != -1);
   double x1 = x[idxLeg1_X_];
-  if ( !(x1 >= 1.e-5 && x1 <= 1.) ) return 0.;
+  if ( !(x1 >= 1.e-3 && x1 <= 1.) ) return 0.;
   
   assert(idxLeg2_t_ != -1);  
   double tk = x[idxLeg2_t_];
@@ -341,17 +341,21 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   double mVis2 = x[3];
   //if ( mVis2 < 1.e-3*mH2_ ) return 0.;
   double x2 = mVis2/(q2_*x1);
-  if ( !(x2 >= 1.e-5 && x2 <= 1.) ) return 0.;
+  if ( !(x2 >= 1.e-3 && x2 <= 1.) ) return 0.;
 
   double vis2Px = -x2*vis1Px/x1;
   double vis2Py = -x2*vis1Py/x1;
   double vis1Pt2 = square(vis1P4.pt());
-  double x1_2 = square(x1);
-  double term1 = 2.*vis1Pt2*x1_2;
-  double term2 = mVis2*vis1Pz*x1_2 - 2.*vis1Pt2*vis1Pz*x1*x2;
+  if ( verbosity_ >= 3 ) {
+    std::cout << "vis1Pt = " << TMath::Sqrt(vis1Pt2) << std::endl;
+  }
+  double term1 = 2.*vis1Pt2;
+  double term2 = vis1Pz*(mVis2 - 2.*(x2/x1)*vis1Pt2);
   double vis1P2 = square(vis1P);
-  double x1_3 = x1_2*x1;
-  double term3_2 = mVis2*vis1P2*x1_3*(mVis2*x1 - 4.*vis1Pt2*x2);
+  double term3_2 = vis1P2*mVis2*(mVis2 - 4.*(x2/x1)*vis1Pt2);
+  if ( verbosity_ >= 3 ) {
+    std::cout << "term1 = " << term1 << ", term3_2 = " << term3_2 << std::endl;
+  }
   if ( term3_2 <= 0. || term1 <= 0. ) return 0.;
   double term3 = TMath::Sqrt(term3_2);
   double vis2Pz_p = (1./term1)*(term2 + term3);
@@ -363,7 +367,9 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
   LorentzVector vis2P4_m(vis2Px, vis2Py, vis2Pz_m, vis2En_m);
   double absDgDp2z_m = TMath::Abs(compDgDp2z(vis1Pz, vis1P, vis2Pz_m, vis2P4_m.P()));
   double prob = 0.;
-  //std::cout << " vis2Pz_p = " << vis2Pz_p << ", absDgDp2z_p = " << absDgDp2z_p << std::endl;
+  if ( verbosity_ >= 3 ) {
+    std::cout << " vis2Pz_p = " << vis2Pz_p << ", absDgDp2z_p = " << absDgDp2z_p << " (sqrtS = " << sqrtS_ << ")" << std::endl;
+  }
   if ( TMath::Abs(vis2Pz_p) <= sqrtS_ && absDgDp2z_p != 0. ) { 
     double prob_p = compProb(x, vis1P4, x1, vis2P4_p, x2, absDgDp2z_p);
     if ( verbosity_ >= 3 ) {
@@ -371,7 +377,9 @@ HttXsectionIntegrandWithTauDecays::Eval(const double* x) const
     }
     prob += prob_p;
   }
-  //std::cout << " vis2Pz_m = " << vis2Pz_m << ", absDgDp2z_m = " << absDgDp2z_m << std::endl;
+  if ( verbosity_ >= 3 ) {
+    std::cout << " vis2Pz_m = " << vis2Pz_m << ", absDgDp2z_m = " << absDgDp2z_m << std::endl;
+  }
   if ( TMath::Abs(vis2Pz_m) <= sqrtS_ && absDgDp2z_m != 0. ) { 
     double prob_m = compProb(x, vis1P4, x1, vis2P4_m, x2, absDgDp2z_m);
     if ( verbosity_ >= 3 ) {
@@ -470,8 +478,8 @@ HttXsectionIntegrandWithTauDecays::compProb(const double* x, const LorentzVector
   double prob_TF = 1.;
 
   // evaluate transfer function for MET/hadronic recoil
-  double residualX = x[6];
-  double residualY = x[7];
+  double residualX = x[4];
+  double residualY = x[5];
   double sumNuPx = nu1Px + nu2Px;
   double sumNuPy = nu1Py + nu2Py;
   double measuredMETx = residualX + sumNuPx;
@@ -619,6 +627,7 @@ HttXsectionIntegrandWithTauDecays::compProb(const double* x, const LorentzVector
   jacobiFactor *= (mVis2_mem/(q4*x1_mem));                                    // transformation from x2 to q^2
   jacobiFactor *= (square(q2_ - mH2_) + GammaH2_times_mH2_)/GammaH_times_mH_; // parametrization of q^2 by tk (Eq. 8 of arXiv:1010.2263 without factor 1/pi, as agreed with Luca and Andrew)
   jacobiFactor *= square(x2_mem);                                             // from delta-functions (tau1Px - tau2Px)*(tau1Py - tau2Py) = (vis1Px/x1 - vis2Px/x2)*(vis1Py/x1 - vis2Py/x2) 
+  jacobiFactor *= 3.*square(x[2]);                                            // CV: reparametrization of vis1Pz by vis1Pz^3
   double prob = prob_flux*prob_PDF*prob_ME*prob_PS_and_tauDecay*prob_TF*prob_acceptance*jacobiFactor;
   if ( verbosity_ >= 2 ) {
     std::cout << "prob: flux = " << prob_flux << ", PDF = " << prob_PDF << ", ME = " << prob_ME << ", PS+decay = " << prob_PS_and_tauDecay << "," 

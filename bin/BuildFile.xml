@@ -77,6 +77,13 @@
   <use name="rootcintex"/>
   <use name="root"/>
 </bin>
+<bin   file="compSVfitMEM_xSection_times_Acc2.cc" name="compSVfitMEM_xSection_times_Acc2">
+  <use name="FWCore/ParameterSet"/>
+  <use name="FWCore/PythonParameterSet"/>
+  <use name="TauAnalysis/SVfitMEM"/>
+  <use name="rootcintex"/>
+  <use name="root"/>
+</bin>
 <bin   file="testTFNormalization.cc" name="testTFNormalization">
   <use name="FWCore/ParameterSet"/>
   <use name="TauAnalysis/SVfitMEM"/>
