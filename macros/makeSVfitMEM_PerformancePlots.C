@@ -671,9 +671,16 @@ void makeSVfitMEM_PerformancePlots()
 
 	  std::cout << "processing sample = " << (*sample) << ", xSection_times_Acc = " << (*xSection_times_Acc_i) << ", logM = " << (*logM_i) << ", numCalls = " << (*numCalls_i) << "..." << std::endl;
 	  
-	  std::string inputFileName_vamp = std::string(inputFilePath).append(Form(
-            "%s/addLogM%i/vamp/maxObjFunctionCalls%ik/%s/H2TauTauTreeProducerTauTau_addSVfitMEM_all.root", 
-	    xSection_times_Acc_i->data(), *logM_i, (*numCalls_i) / 1000, sample->data()));
+	  std::string inputFileName_vamp;
+	  if ( (*logM_i) == 6 ) {
+	    inputFileName_vamp = std::string(inputFilePath).append(Form(
+              "%s/addLogM%i/vamp/maxObjFunctionCalls%ik/nom/%s/H2TauTauTreeProducerTauTau_addSVfitMEM_all.root", 
+	      xSection_times_Acc_i->data(), *logM_i, (*numCalls_i) / 1000, sample->data()));
+	  } else {
+	    inputFileName_vamp = std::string(inputFilePath).append(Form(
+              "%s/addLogM%i/vamp/maxObjFunctionCalls%ik/%s/H2TauTauTreeProducerTauTau_addSVfitMEM_all.root", 
+	      xSection_times_Acc_i->data(), *logM_i, (*numCalls_i) / 1000, sample->data()));
+	  }
 	  TTree* tree_vamp = loadTree(inputFileName_vamp, inputFilesToClose2d, treeName);	  
 	  std::vector<double> svFit = extractVarFromTree(tree_vamp, "svfitMass", mH_i);
 	  delete tree_vamp;

@@ -52,7 +52,7 @@ bool isHigherMass(const entryType& entry1, const entryType& entry2)
   return (entry1.mH_ < entry2.mH_);
 }
 
-std::vector<TGraphErrors*> processTree(TTree* tree, int selLeg1decayMode, int selLeg2decayMode, int selIntMode)
+std::vector<TGraphErrors*> processTree(TTree* tree, int selLeg1decayMode, int selLeg2decayMode, const std::string& sqrtS)
 {
   Float_t mH;
   tree->SetBranchAddress("mH", &mH);
@@ -116,26 +116,27 @@ std::vector<TGraphErrors*> processTree(TTree* tree, int selLeg1decayMode, int se
 
   // WARNING: mapping of selIntMode to intMode_string needs to match definition in
   //          TauAnalysis/SVfitMEM/interface/SVfitMEM.h !!
-  std::string intMode_string;
-  if      ( selIntMode == 1 ) intMode_string = "vegas";
-  else if ( selIntMode == 2 ) intMode_string = "vamp";
-  else assert(0);
+  //std::string intMode_string;
+  //if      ( selIntMode == 1 ) intMode_string = "vegas";
+  //else if ( selIntMode == 2 ) intMode_string = "vamp";
+  //else assert(0);
+  std::string intMode_string = "vamp";
 
   TGraphErrors* graph_Xsection_woAcc = new TGraphErrors(entries.size()); 
-  std::string graphName_Xsection_woAcc = Form("graph_Xsection_woAcc_%s_%s", decayMode_string.data(), intMode_string.data());
+  std::string graphName_Xsection_woAcc = Form("graph_Xsection_woAcc_%s_%s_%s", sqrtS.data(), decayMode_string.data(), intMode_string.data());
   graph_Xsection_woAcc->SetName(graphName_Xsection_woAcc.data());
   TGraphErrors* graph_Xsection_times_BR_woAcc = new TGraphErrors(entries.size()); 
-  std::string graphName_Xsection_times_BR_woAcc = Form("graph_Xsection_times_BR_woAcc_%s_%s", decayMode_string.data(), intMode_string.data());
+  std::string graphName_Xsection_times_BR_woAcc = Form("graph_Xsection_times_BR_woAcc_%s_%s_%s", sqrtS.data(), decayMode_string.data(), intMode_string.data());
   graph_Xsection_times_BR_woAcc->SetName(graphName_Xsection_times_BR_woAcc.data());
   
   TGraphErrors* graph_Xsection_wAcc = new TGraphErrors(entries.size()); 
-  std::string graphName_Xsection_wAcc = Form("graph_Xsection_wAcc_%s_%s", decayMode_string.data(), intMode_string.data());
+  std::string graphName_Xsection_wAcc = Form("graph_Xsection_wAcc_%s_%s_%s", sqrtS.data(), decayMode_string.data(), intMode_string.data());
   graph_Xsection_wAcc->SetName(graphName_Xsection_wAcc.data());
   TGraphErrors* graph_Xsection_times_BR_wAcc = new TGraphErrors(entries.size()); 
-  std::string graphName_Xsection_times_BR_wAcc = Form("graph_Xsection_times_BR_wAcc_%s_%s", decayMode_string.data(), intMode_string.data());
+  std::string graphName_Xsection_times_BR_wAcc = Form("graph_Xsection_times_BR_wAcc_%s_%s_%s", sqrtS.data(), decayMode_string.data(), intMode_string.data());
   graph_Xsection_times_BR_wAcc->SetName(graphName_Xsection_times_BR_wAcc.data());
   TGraphErrors* graph_Acc = new TGraphErrors(entries.size()); 
-  std::string graphName_Acc = Form("graph_Acc_%s_%s", decayMode_string.data(), intMode_string.data());
+  std::string graphName_Acc = Form("graph_Acc_%s_%s_%s", sqrtS.data(), decayMode_string.data(), intMode_string.data());
   graph_Acc->SetName(graphName_Acc.data());
 
   int idxPoint = 0;
@@ -173,46 +174,52 @@ void makeSVfitMEM_xSection_times_AccGraphs()
 
   std::string inputFilePath = "/afs/cern.ch/user/v/veelken/scratch0/SVfitMEM_with_vamp/CMSSW_7_4_6/src/TauAnalysis/SVfitMEM/macros/data/";
 
-  std::map<int, std::map<int, std::map<int, std::string> > > inputFileNames; // key = selLeg1decayMode, selLeg2decayMode, selIntMode
-  inputFileNames[1][1][1] = "compSVfitMEM_xSection_times_Acc_hadhad_vamp_all.root";
-  inputFileNames[1][1][2] = "compSVfitMEM_xSection_times_Acc_hadhad_vegas_all.root";
-  inputFileNames[1][2][1] = "compSVfitMEM_xSection_times_Acc_hadlep_vamp_all.root";
-  inputFileNames[1][2][2] = "compSVfitMEM_xSection_times_Acc_hadlep_vegas_all.root";
-  inputFileNames[2][1][1] = "compSVfitMEM_xSection_times_Acc_lephad_vamp_all.root";
-  inputFileNames[2][1][2] = "compSVfitMEM_xSection_times_Acc_lephad_vegas_all.root";
-  inputFileNames[2][2][1] = "compSVfitMEM_xSection_times_Acc_leplep_vamp_all.root";
-  inputFileNames[2][2][2] = "compSVfitMEM_xSection_times_Acc_leplep_vegas_all.root";
+  std::map<int, std::map<int, std::map<std::string, std::string> > > inputFileNames; // key = selLeg1decayMode, selLeg2decayMode, sqrtS
+  inputFileNames[1][1]["8TeV"] = "compSVfitMEM_xSection_times_Acc_8TeV_hadhad_vamp_all.root";
+  inputFileNames[1][2]["8TeV"] = "compSVfitMEM_xSection_times_Acc_8TeV_hadlep_vamp_all.root";
+  inputFileNames[2][1]["8TeV"] = "compSVfitMEM_xSection_times_Acc_8TeV_lephad_vamp_all.root";
+  inputFileNames[2][2]["8TeV"] = "compSVfitMEM_xSection_times_Acc_8TeV_leplep_vamp_all.root";
+  inputFileNames[1][1]["13TeV"] = "compSVfitMEM_xSection_times_Acc_13TeV_hadhad_vamp_all.root";
+  inputFileNames[1][2]["13TeV"] = "compSVfitMEM_xSection_times_Acc_13TeV_hadlep_vamp_all.root";
+  inputFileNames[2][1]["13TeV"] = "compSVfitMEM_xSection_times_Acc_13TeV_lephad_vamp_all.root";
+  inputFileNames[2][2]["13TeV"] = "compSVfitMEM_xSection_times_Acc_13TeV_leplep_vamp_all.root";
 
-  std::vector<TFile*> inputFilesToClose;
-  
-  std::vector<TGraphErrors*> graphs;
+  std::vector<std::string> center_of_mass_energies;
+  center_of_mass_energies.push_back("8TeV");
+  center_of_mass_energies.push_back("13TeV");
 
-  for ( int selLeg1decayMode = 1; selLeg1decayMode <= 2; ++selLeg1decayMode ) {
-    for ( int selLeg2decayMode = 1; selLeg2decayMode <= 2; ++selLeg2decayMode ) {
-      for ( int selIntMode = 1; selIntMode <= 2; ++selIntMode ) {
-	assert(inputFileNames[selLeg1decayMode][selLeg2decayMode][selIntMode] != "");
-	std::string inputFileName_job = std::string(inputFilePath).append(inputFileNames[selLeg1decayMode][selLeg2decayMode][selIntMode]);
+  for ( std::vector<std::string>::const_iterator sqrtS = center_of_mass_energies.begin(); sqrtS != center_of_mass_energies.end(); ++sqrtS ) {
+    
+    std::vector<TFile*> inputFilesToClose;
+    
+    std::vector<TGraphErrors*> graphs;
+    
+    for ( int selLeg1decayMode = 1; selLeg1decayMode <= 2; ++selLeg1decayMode ) {
+      for ( int selLeg2decayMode = 1; selLeg2decayMode <= 2; ++selLeg2decayMode ) {
+	assert(inputFileNames[selLeg1decayMode][selLeg2decayMode][*sqrtS] != "");
+	std::string inputFileName_job = std::string(inputFilePath).append(inputFileNames[selLeg1decayMode][selLeg2decayMode][*sqrtS]);
 	TTree* tree = loadTree(inputFileName_job, inputFilesToClose);
-	std::vector<TGraphErrors*> graphs_job = processTree(tree, selLeg1decayMode, selLeg2decayMode, selIntMode);
+	std::vector<TGraphErrors*> graphs_job = processTree(tree, selLeg1decayMode, selLeg2decayMode, *sqrtS);
 	graphs.insert(graphs.end(), graphs_job.begin(), graphs_job.end());
       }
     }
-  }
-
-  TFile* outputFile = new TFile("makeSVfitMEM_xSection_times_AccGraphs.root", "RECREATE");
-  for ( std::vector<TGraphErrors*>::iterator graph = graphs.begin();
-	graph != graphs.end(); ++graph ) {
-    (*graph)->Write();
-  }
-  delete outputFile;
     
-  for ( std::vector<TFile*>::iterator inputFile = inputFilesToClose.begin();
-	inputFile != inputFilesToClose.end(); ++inputFile ) {
-    delete (*inputFile);
-  }
-
-  for ( std::vector<TGraphErrors*>::iterator graph = graphs.begin();
-	graph != graphs.end(); ++graph ) {
-    delete (*graph);
+    std::string outputFileName = Form("makeSVfitMEM_xSection_times_AccGraphs_%s.root", sqrtS->data());
+    TFile* outputFile = new TFile(outputFileName.data(), "RECREATE");
+    for ( std::vector<TGraphErrors*>::iterator graph = graphs.begin();
+	  graph != graphs.end(); ++graph ) {
+      (*graph)->Write();
+    }
+    delete outputFile;
+    
+    for ( std::vector<TFile*>::iterator inputFile = inputFilesToClose.begin();
+	  inputFile != inputFilesToClose.end(); ++inputFile ) {
+      delete (*inputFile);
+    }
+    
+    for ( std::vector<TGraphErrors*>::iterator graph = graphs.begin();
+	  graph != graphs.end(); ++graph ) {
+      delete (*graph);
+    }
   }
 }

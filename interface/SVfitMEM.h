@@ -4,6 +4,7 @@
 #include "TauAnalysis/SVfitMEM/interface/SVfitIntegrand.h"
 #include "TauAnalysis/SVfitMEM/interface/SVfitIntegratorBase.h"
 #include "TauAnalysis/SVfitMEM/interface/MeasuredTauLepton.h"
+#include "TauAnalysis/SVfitTF/interface/HadTauTFBase.h"
 
 #include <TBenchmark.h>
 #include <TFile.h>
@@ -28,8 +29,22 @@ class SVfitMEM
     addLogM_power_ = power; 
   }
 
-  /// take resolution on energy of hadronic tau decays into account
-  void shiftVisPt(bool value, TFile* inputFile);
+  /// set transfer functions for pT of hadronic tau decays
+  void setHadTauTF(const HadTauTFBase* hadTauTF) 
+  { 
+    integrand_->setHadTauTF(hadTauTF);
+  }
+  /// enable/disable use of transfer functions for hadronic tau decays
+  void enableHadTauTF() 
+  { 
+    integrand_->enableHadTauTF();
+    useHadTauTF_ = true; 
+  }
+  void disableHadTauTF() 
+  { 
+    integrand_->disableHadTauTF();
+    useHadTauTF_ = false; 
+  }
 
   /// number of function calls for Markov Chain and VEGAS integration (default is 100000)
   void setMaxObjFunctionCalls(unsigned maxObjFunctionCalls) 
@@ -91,11 +106,8 @@ class SVfitMEM
   bool addLogM_; 
   double addLogM_power_; 
 
-  /// resolution on Pt and mass of hadronic taus
-  bool shiftVisPt_;  
-  const TH1* lutVisPtResDM0_;
-  const TH1* lutVisPtResDM1_;
-  const TH1* lutVisPtResDM10_;
+  /// account for resolution on pT of hadronic tau decays via appropriate transfer functions
+  bool useHadTauTF_;
 
   /// clock for measuring run-time of algorithm
   TBenchmark* clock_;

@@ -44,11 +44,8 @@ SVfitMEM::SVfitMEM(double sqrtS, const std::string& pdfName, int mode, const std
     graph_Acc_(0),
     minAcc_(1.e-2),
     addLogM_(true), 
-    addLogM_power_(7.), // CV: best compatibility with "old" SVfitStandalone algorithm
-    shiftVisPt_(false),
-    lutVisPtResDM0_(0),
-    lutVisPtResDM1_(0),
-    lutVisPtResDM10_(0),
+    addLogM_power_(6.), // CV: best compatibility with "old" SVfitStandalone algorithm
+    useHadTauTF_(false),
     clock_(0),
     verbosity_(verbosity)
 { 
@@ -66,10 +63,6 @@ SVfitMEM::~SVfitMEM()
   //delete graph_xSection_;
   //delete graph_Acc_;
 
-  delete lutVisPtResDM0_;
-  delete lutVisPtResDM1_;
-  delete lutVisPtResDM10_;
-
   delete clock_;
 }
 
@@ -85,33 +78,6 @@ void SVfitMEM::setCrossSection_and_Acc(const TGraphErrors* graph_xSection, const
   graph_xSection_ = graph_xSection;
   graph_Acc_ = graph_Acc;
   minAcc_ = minAcc;
-}
-
-namespace
-{
-  TH1* readHistogram(TFile* inputFile, const std::string& histogramName)
-  {
-    TH1* histogram = dynamic_cast<TH1*>(inputFile->Get(histogramName.data()));
-    if ( !histogram ) {
-      std::cerr << "<readHistogram>: Failed to load histogram = " << histogramName << " from file = " << inputFile->GetName() << " !!" << std::endl;
-      assert(0);
-    }
-    return (TH1*)histogram->Clone();
-  }
-}
-
-void 
-SVfitMEM::shiftVisPt(bool value, TFile* inputFile)
-{
-  shiftVisPt_ = value;
-  if ( shiftVisPt_ ) {
-    delete lutVisPtResDM0_;
-    lutVisPtResDM0_ = readHistogram(inputFile, "recTauPtDivGenTauPt_recDecayModeEq0");
-    delete lutVisPtResDM1_;
-    lutVisPtResDM1_ = readHistogram(inputFile, "recTauPtDivGenTauPt_recDecayModeEq1");
-    delete lutVisPtResDM10_;
-    lutVisPtResDM10_ = readHistogram(inputFile, "recTauPtDivGenTauPt_recDecayModeEq10");
-  }
 }
 
 namespace
@@ -244,13 +210,11 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
   int idxLeg1_phi = -1;
   int idxLeg1VisPtShift = -1;
   int idxLeg1_mNuNu = -1;
-  const TH1* leg1lutVisPtRes = 0;
 
   int idxLeg2_t = -1;
   int idxLeg2_phi = -1;
   int idxLeg2VisPtShift = -1;
   int idxLeg2_mNuNu = -1;
-  const TH1* leg2lutVisPtRes = 0;
 
   numDimensions_ = 0; 
   
@@ -262,19 +226,7 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
       idxLeg1_phi = numDimensions_;
       numDimensions_ += 1;
       if ( measuredTauLepton.type() == MeasuredTauLepton::kTauToHadDecay ) { 
-	if ( shiftVisPt_ ) {
-	  if ( measuredTauLepton.decayMode() == 0 ) {
-	    leg1lutVisPtRes = lutVisPtResDM0_;
-	  } else if ( measuredTauLepton.decayMode() == 1 || measuredTauLepton.decayMode() == 2 ) {
-	    leg1lutVisPtRes = lutVisPtResDM1_;
-	  } else if ( measuredTauLepton.decayMode() == 10 ) {
-	    leg1lutVisPtRes = lutVisPtResDM10_;
-	  } else {
-	    std::cerr << "Warning: shiftVisPt is enabled, but leg1 decay mode = " << measuredTauLepton.decayMode() << " is not supported" 
-		      << " --> disabling shiftVisPt for this event !!" << std::endl;
-	  }
-        }
-	if ( leg1lutVisPtRes ) {
+	if ( useHadTauTF_ ) {
 	  idxLeg1VisPtShift = numDimensions_;
 	  ++numDimensions_;
 	}
@@ -289,19 +241,7 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
       idxLeg2_phi = numDimensions_;
       numDimensions_ += 1;
       if ( measuredTauLepton.type() == MeasuredTauLepton::kTauToHadDecay ) { 
-	if ( shiftVisPt_ ) {
-	  if ( measuredTauLepton.decayMode() == 0 ) {
-	    leg2lutVisPtRes = lutVisPtResDM0_;
-	  } else if ( measuredTauLepton.decayMode() == 1 || measuredTauLepton.decayMode() == 2 ) {
-	    leg2lutVisPtRes = lutVisPtResDM1_;
-	  } else if ( measuredTauLepton.decayMode() == 10 ) {
-	    leg2lutVisPtRes = lutVisPtResDM10_;
-	  } else {
-	    std::cerr << "Warning: shiftVisPt is enabled, but leg2 decay mode = " << measuredTauLepton.decayMode() << " is not supported" 
-		      << " --> disabling shiftVisPt for this event !!" << std::endl;
-	  }
-	}
-	if ( leg2lutVisPtRes ) {
+	if ( useHadTauTF_ ) {
 	  idxLeg2VisPtShift = numDimensions_;
 	  ++numDimensions_;
 	}
@@ -313,7 +253,8 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
   }
 
   integrand_->setInputs(measuredTauLeptons_rounded, measuredMETx_rounded, measuredMETy_rounded, covMET_rounded);
-  //integrand_->shiftVisPt(shiftVisPt_, leg1lutVisPtRes, leg2lutVisPtRes);
+  if ( useHadTauTF_ ) integrand_->enableHadTauTF();
+  else integrand_->disableHadTauTF();
   integrand_->setIdxLeg1_X(idxLeg1_X);
   integrand_->setIdxLeg1_phi(idxLeg1_phi);
   integrand_->setIdxLeg1VisPtShift(idxLeg1VisPtShift);
@@ -363,8 +304,8 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
   xl_[idxLeg1_phi] = -TMath::Pi();
   xu_[idxLeg1_phi] = +TMath::Pi();
   if ( idxLeg1VisPtShift != -1 ) {
-    xl_[idxLeg1VisPtShift] = 0.5;
-    xu_[idxLeg1VisPtShift] = 1.5;
+    xl_[idxLeg1VisPtShift] = 0.;
+    xu_[idxLeg1VisPtShift] = 2.;
   }
   if ( idxLeg1_mNuNu != -1 ) {
     xl_[idxLeg1_mNuNu] = 0.;
@@ -375,8 +316,8 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
   xl_[idxLeg2_phi] = -TMath::Pi();
   xu_[idxLeg2_phi] = +TMath::Pi();
   if ( idxLeg2VisPtShift != -1 ) {
-    xl_[idxLeg2VisPtShift] = 0.5;
-    xu_[idxLeg2VisPtShift] = 1.5;
+    xl_[idxLeg2VisPtShift] = 0.;
+    xu_[idxLeg2VisPtShift] = 2.;
   }
   if ( idxLeg2_mNuNu != -1 ) {
     xl_[idxLeg2_mNuNu] = 0.;

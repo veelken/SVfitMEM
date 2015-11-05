@@ -4,6 +4,7 @@
 #include "TauAnalysis/SVfitMEM/interface/MeasuredTauLepton.h"
 #include "TauAnalysis/SVfitMEM/interface/me_ggH_mg5.h"
 #include "TauAnalysis/SVfitMEM/interface/me_ggH_lit.h"
+#include "TauAnalysis/SVfitTF/interface/HadTauTFBase.h"
 
 #include "LHAPDF/LHAPDF.h"
 
@@ -36,8 +37,25 @@ namespace svFitMEM
 
     void setMtest(double);
 
-    /// take resolution on energy and mass of hadronic tau decays into account
-    void shiftVisPt(bool, const TH1*, const TH1*);
+    /// set transfer functions for pT of hadronic tau decays
+    void setHadTauTF(const HadTauTFBase* hadTauTF) 
+    { 
+      hadTauTF1_ = hadTauTF->Clone("leg1"); 
+      hadTauTF2_ = hadTauTF->Clone("leg2");
+    }
+    /// enable/disable use of transfer functions for hadronic tau decays
+    void enableHadTauTF() 
+    { 
+      if ( !(hadTauTF1_ && hadTauTF2_) ) {
+	std::cerr << "No tau pT transfer functions defined, call 'setHadTauTF' function first !!" << std::endl;
+	assert(0);
+      }      
+      useHadTauTF_ = true; 
+    }
+    void disableHadTauTF() 
+    { 
+      useHadTauTF_ = false; 
+    }
 
     /// set momenta of visible tau decay products and of reconstructed missing transverse energy
     void setInputs(const std::vector<svFitMEM::MeasuredTauLepton>&, double, double, const TMatrixD&);
@@ -106,10 +124,11 @@ namespace svFitMEM
     double invCovMETyx_;
     double invCovMETyy_;
     double const_MET_;
-  
-    bool shiftVisPt_;
-    const TH1* leg1lutVisPtRes_;
-    const TH1* leg2lutVisPtRes_;
+    
+    /// account for resolution on pT of hadronic tau decays via appropriate transfer functions
+    const HadTauTFBase* hadTauTF1_;
+    const HadTauTFBase* hadTauTF2_;
+    bool useHadTauTF_;
 
     int idxLeg1_X_;
     int idxLeg1_phi_;

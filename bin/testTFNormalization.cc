@@ -5,7 +5,7 @@
 */
 
 #include "TauAnalysis/SVfitMEM/interface/svFitAuxFunctions.h"
-#include "TauAnalysis/SVfitTF/interface/CrystalBall.h"
+#include "TauAnalysis/SVfitTF/interface/HadTauTFCrystalBall.h"
 
 #include <gsl/gsl_monte.h>
 #include <gsl/gsl_monte_vegas.h>
@@ -137,18 +137,18 @@ double gTF_lepTauDecay(double* x, size_t dim, void* params_void)
 
 double gTF_hadTauEn(double* x, size_t dim, void* params_void)
 {
-  static CrystalBall* gCrystalBall = 0;
-  if ( !gCrystalBall ) {
-    gCrystalBall = new CrystalBall();
+  static HadTauTFCrystalBall* gHadTauTFCrystalBall = 0;
+  if ( !gHadTauTFCrystalBall ) {
+    gHadTauTFCrystalBall = new HadTauTFCrystalBall();
   }
   double* params = (double*)params_void;
   double genTauPt = params[0];
   double genTauEta = params[1];
   int decayMode = TMath::Nint(params[2]);
-  gCrystalBall->setDecayMode(decayMode);
+  gHadTauTFCrystalBall->setDecayMode(decayMode);
   double rec_div_genTauPt = x[0];
   double recTauPt = rec_div_genTauPt*genTauPt;
-  double prob = (*gCrystalBall)(recTauPt, genTauPt, genTauEta);
+  double prob = (*gHadTauTFCrystalBall)(recTauPt, genTauPt, genTauEta);
   //static int idxCall = 0;
   //std::cout << "<gTF_hadTauEn (call #" << idxCall << "): prob = " << prob << std::endl;
   //++idxCall;
