@@ -54,6 +54,27 @@ bool isHigherMass(const entryType& entry1, const entryType& entry2)
 
 std::vector<TGraphErrors*> processTree(TTree* tree, int selLeg1decayMode, int selLeg2decayMode, const std::string& sqrtS)
 {
+  std::cout << "<processTree>:" << std::endl;
+
+  // WARNING: mapping of selLeg1decayMode and selLeg2decayMode to decayMode_string needs to match definition in
+  //          TauAnalysis/SVfitMEM/interface/MeasuredTauLepton.h !!
+  std::string decayMode_string = "";
+  if      ( selLeg1decayMode == 1 && selLeg2decayMode == 1 ) decayMode_string = "hadhad";
+  else if ( selLeg1decayMode != 1 && selLeg2decayMode == 1 ) decayMode_string = "lephad";
+  else if ( selLeg1decayMode == 1 && selLeg2decayMode != 1 ) decayMode_string = "hadlep";
+  else if ( selLeg1decayMode != 1 && selLeg2decayMode != 1 ) decayMode_string = "leplep";
+  else assert(0);
+  std::cout << " decayMode = " << decayMode_string << " (selLeg1decayMode = " << selLeg1decayMode << ", selLeg2decayMode = " << selLeg2decayMode << ")" << std::endl;
+
+  // WARNING: mapping of selIntMode to intMode_string needs to match definition in
+  //          TauAnalysis/SVfitMEM/interface/SVfitMEM.h !!
+  //std::string intMode_string;
+  //if      ( selIntMode == 1 ) intMode_string = "vegas";
+  //else if ( selIntMode == 2 ) intMode_string = "vamp";
+  //else assert(0);
+  std::string intMode_string = "vamp";
+  std::cout << " intMode = " << intMode_string << std::endl;
+
   Float_t mH;
   tree->SetBranchAddress("mH", &mH);
   Int_t leg1decayMode, leg2decayMode;
@@ -78,14 +99,19 @@ std::vector<TGraphErrors*> processTree(TTree* tree, int selLeg1decayMode, int se
   std::vector<entryType> entries;
 
   int numEntries = tree->GetEntries();
+  std::cout << " numEntries = " << numEntries << std::endl;
   for ( int iEntry = 0; iEntry < numEntries; ++iEntry ) {
-    if ( iEntry > 0 && (iEntry % 1000) == 0 ) {
-      std::cout << "processing Entry " << iEntry << std::endl;
-    }
+    //if ( iEntry > 0 && (iEntry % 1000) == 0 ) {
+    //  std::cout << "processing Entry " << iEntry << std::endl;
+    //}
 
     tree->GetEntry(iEntry);
 
-    if ( !(leg1decayMode == selLeg1decayMode && leg2decayMode == selLeg2decayMode) ) continue;
+    if ( !(((leg1decayMode == 1 && selLeg1decayMode == 1) || (leg1decayMode != 1 && selLeg1decayMode != 1))  &&
+	   ((leg2decayMode == 1 && selLeg2decayMode == 1) || (leg2decayMode != 1 && selLeg2decayMode != 1))) ) {
+      std::cerr << "Warning: wrong decay modes found in tree (leg1decayMode = " << leg1decayMode << ", leg2decayMode = " << leg2decayMode << ") --> skipping !!" << std::endl;
+      continue;
+    }
 
     entryType entry;
     entry.mH_ = mH;
@@ -104,23 +130,10 @@ std::vector<TGraphErrors*> processTree(TTree* tree, int selLeg1decayMode, int se
   }
 
   std::sort(entries.begin(), entries.end(), isHigherMass);
-
-  // WARNING: mapping of selLeg1decayMode and selLeg2decayMode to decayMode_string needs to match definition in
-  //          TauAnalysis/SVfitMEM/interface/MeasuredTauLepton.h !!
-  std::string decayMode_string = "";
-  if      ( selLeg1decayMode == 1 && selLeg2decayMode == 1 ) decayMode_string = "hadhad";
-  else if ( selLeg1decayMode != 1 && selLeg2decayMode == 1 ) decayMode_string = "lephad";
-  else if ( selLeg1decayMode == 1 && selLeg2decayMode != 1 ) decayMode_string = "hadlep";
-  else if ( selLeg1decayMode != 1 && selLeg2decayMode != 1 ) decayMode_string = "leplep";
-  else assert(0);
-
-  // WARNING: mapping of selIntMode to intMode_string needs to match definition in
-  //          TauAnalysis/SVfitMEM/interface/SVfitMEM.h !!
-  //std::string intMode_string;
-  //if      ( selIntMode == 1 ) intMode_string = "vegas";
-  //else if ( selIntMode == 2 ) intMode_string = "vamp";
-  //else assert(0);
-  std::string intMode_string = "vamp";
+  for ( std::vector<entryType>::const_iterator entry = entries.begin();
+	entry != entries.end(); ++entry ) {
+    std::cout << "mH = " << entry->mH_ << ": xSection = " << entry->xSection_ << " +/- " << entry->xSectionErr_ << ", Acc = " << entry->Acc_ << " +/- " << entry->AccErr_ << std::endl;
+  }
 
   TGraphErrors* graph_Xsection_woAcc = new TGraphErrors(entries.size()); 
   std::string graphName_Xsection_woAcc = Form("graph_Xsection_woAcc_%s_%s_%s", sqrtS.data(), decayMode_string.data(), intMode_string.data());

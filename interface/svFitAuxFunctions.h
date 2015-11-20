@@ -105,6 +105,7 @@ namespace svFitMEM
     double xErr_;
     double y_;
     double yErr_;    
+    double mTest_step_;
   };
   TGraphErrors* makeGraph(const std::string&, const std::vector<GraphPoint>&);
 

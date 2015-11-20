@@ -335,6 +335,7 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
   std::vector<GraphPoint> graphPoints;
   std::set<int> mTest_computed;
   double pMax = 0.;
+  double xMax = -1.;
 
 //--- call VEGAS routine (part of GNU scientific library)
 //    to perform actual integration
@@ -355,14 +356,17 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
       else assert(0);
       mTest_min = sqrtS_;
       mTest_max = 0.;
+      //int idxGraphPoint = 0;
       for ( std::vector<GraphPoint>::const_iterator graphPoint = graphPoints.begin();
 	    graphPoint != graphPoints.end(); ++graphPoint ) {
-	if ( graphPoint->y_ > pMin ) {
+	//std::cout << "graphPoint #" << idxGraphPoint << ": mTest = " << graphPoint->x_ << ", p = " << graphPoint->y_ << " (mTest_step = " << graphPoint->mTest_step_ << ")" << std::endl;
+	//++idxGraphPoint;
+	if ( graphPoint->y_ > pMin || TMath::Abs(graphPoint->x_ - xMax) < (2.5*(graphPoint->mTest_step_ - 1.)*xMax) ) { // CV: always scan at least mTest range corresponding to two coarse steps 
 	  if ( graphPoint->x_ < mTest_min ) mTest_min = graphPoint->x_;
 	  if ( graphPoint->x_ > mTest_max ) mTest_max = graphPoint->x_;
 	}
       }
-    }
+    }    
     if ( verbosity_ >= 1 ) {
       std::cout << "starting iteration #" << idxIter << ": mTest_min = " << mTest_min << ", mTest_max = " << mTest_max << std::endl;
     }
@@ -372,7 +376,12 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
 
     double mTest = 1.0125*mVis;
     if ( mTest < mTest_min ) mTest = mTest_min;
-    while ( mTest < mTest_max && !skipHighMassTail ) {
+    // !!! ONLY FOR TESTING
+    //mTest = 3200.;
+    //mTest_max = 3200.;
+    //if ( idxIter != 0 ) continue;
+    //     FOR TESTING ONLY !!!
+    while ( mTest <= mTest_max && !skipHighMassTail ) {
       if ( mTest_computed.find(TMath::Nint(mTest*1.e+2)) == mTest_computed.end() ) {
 	integrand_->setMtest(mTest);
 	
@@ -399,6 +408,10 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
 	    xSection_times_Acc = xSection*Acc;
 	    xSection_times_AccErr = xSection_times_Acc*TMath::Sqrt(xSection_times_AccRelErr2);
 	  }
+          if ( verbosity_ >= 2 ) {
+	    std::cout << "xSection = " << xSection << " +/- " << xSectionErr << std::endl;
+            std::cout << "xSection*Acc = " << xSection_times_Acc << " +/- " << xSection_times_AccErr << std::endl;
+          }
 	  if ( xSection_times_Acc > 0. ) {
 	    p /= xSection_times_Acc;
 	    if ( p > 0. && xSection_times_Acc > 0. ) pErr = p*TMath::Sqrt(square(pErr/p) + square(xSection_times_AccErr/xSection_times_Acc));
@@ -421,7 +434,11 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
       
 	// CV: in order to reduce computing time, skip precise computation of integral
 	//     if in high mass tail and probability negligible anyway
-	if ( p > pMax ) pMax = p;
+	if ( p > pMax ) {
+	  pMax = p;
+	  xMax = mTest;
+	  //std::cout << "setting xMax = " << xMax << ": pMax = " << pMax << std::endl;
+	}
 	if ( idxIter == 0 ) {
 	  if ( pMax > 1.e-20 && (p + 3.*TMath::Abs(pErr)) < (pMax*precision_) ) ++numMassParBelowThreshold;
 	  else numMassParBelowThreshold = 0;
@@ -435,6 +452,7 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
 	graphPoint.xErr_ = 0.5*(mTest_step - 1.)*mTest;
 	graphPoint.y_ = p;
 	graphPoint.yErr_ = pErr;
+	graphPoint.mTest_step_ = mTest_step;
 	graphPoints.push_back(graphPoint);
 
 	mTest_computed.insert(TMath::Nint(mTest*1.e+2));
