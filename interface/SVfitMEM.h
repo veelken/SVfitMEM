@@ -46,6 +46,12 @@ class SVfitMEM
     useHadTauTF_ = false; 
   }
 
+  /// set correlation between hadronic tau pT and MET
+  void setRhoHadTau(double rhoHadTau) 
+  { 
+    integrand_->setRhoHadTau(rhoHadTau);
+  }
+
   /// number of function calls for Markov Chain and VEGAS integration (default is 100000)
   void setMaxObjFunctionCalls(unsigned maxObjFunctionCalls) 
   { 
@@ -67,6 +73,8 @@ class SVfitMEM
   double massErr() const { return massErr_; }
   /// return maximum of likelihood function
   double Lmax() const { return Lmax_; }  
+  /// return flag indicating if algorithm succeeded to find valid solution
+  bool isValidSolution() { return isValidSolution_; }
 
   enum { kMarkovChain, kVEGAS, kVAMP }; 
 
@@ -96,6 +104,8 @@ class SVfitMEM
   double massErr_;
   /// maximum of likelihood function
   double Lmax_;
+  /// flag indicating if algorithm succeeded to find valid solution
+  bool isValidSolution_;
 
   /// cross-section*signal acceptance/efficiency as function of mass
   const TGraphErrors* graph_xSection_;

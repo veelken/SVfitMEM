@@ -8,6 +8,8 @@
 #include <TH1.h>
 #include <Math/VectorUtil.h>
 
+#include <math.h>
+
 using namespace svFitMEM;
 
 /// global function pointer, needed for VEGAS integration
@@ -28,6 +30,7 @@ SVfitIntegrand::SVfitIntegrand(double sqrtS, const std::string& pdfName, int mod
     hadTauTF1_(0),
     hadTauTF2_(0),
     useHadTauTF_(false),
+    rhoHadTau_(0.),
     idxLeg1_X_(-1),
     idxLeg1_phi_(-1),
     idxLeg1VisPtShift_(-1),
@@ -36,6 +39,7 @@ SVfitIntegrand::SVfitIntegrand(double sqrtS, const std::string& pdfName, int mod
     idxLeg2_phi_(-1),
     idxLeg2VisPtShift_(-1),
     idxLeg2_mNuNu_(-1),
+    numDimensions_(0),
     pdf_(0),
     pdfIsInitialized_(false),
     me_madgraph_(false, true),
@@ -109,10 +113,8 @@ SVfitIntegrand::setMtest(double mTest)
   // reset 'TestMass' error code
   errorCode_ &= (errorCode_ ^ TestMass);
   
-  mVis_ = (measuredTauLepton1_.p4() + measuredTauLepton2_.p4()).mass();
-  mVis2_ = square(mVis_);
-  if ( mTest < TMath::Sqrt(mVis2_) ) {
-    std::cerr << "Error: Cannot have mTest < mVis = " << TMath::Sqrt(mVis2_) << " !!" << std::endl;
+  if ( mTest < TMath::Sqrt(mVis2_measured_) ) {
+    std::cerr << "Error: Cannot have mTest < mVis = " << TMath::Sqrt(mVis2_measured_) << " !!" << std::endl;
     errorCode_ |= TestMass;
     return;
   }
@@ -192,11 +194,11 @@ SVfitIntegrand::setInputs(const std::vector<MeasuredTauLepton>& measuredTauLepto
   leg2eZ_y_ = eZ2.y();
   leg2eZ_z_ = eZ2.z();
 
-  mVis_  = (measuredTauLepton1_.p4() + measuredTauLepton2_.p4()).mass();
+  mVis_measured_ = (measuredTauLepton1_.p4() + measuredTauLepton2_.p4()).mass();
   if ( verbosity_ >= 2 ) {
-    std::cout << "mVis = " << mVis_ << std::endl;
+    std::cout << "mVis = " << mVis_measured_ << std::endl;
   }
-  mVis2_ = square(mVis_);
+  mVis2_measured_ = square(mVis_measured_);
 
   measuredMETx_ = measuredMETx;
   measuredMETy_ = measuredMETy;
@@ -321,8 +323,24 @@ namespace
 double
 SVfitIntegrand::Eval(const double* x) const 
 {
+  // !!! ONLY FOR TESTING
+  //double* x_nonconst = const_cast<double*>(x);
+  //x_nonconst[idxLeg1_X_] = 0.396371;
+  //x_nonconst[idxLeg1_phi_] = -1.70085;
+  //if ( idxLeg1VisPtShift_ != -1 ) x_nonconst[idxLeg1VisPtShift_] = 1.;
+  //x_nonconst[idxLeg2_t_] = 1.56448;
+  //x_nonconst[idxLeg2_phi_] = -1.30845;
+  //if ( idxLeg2VisPtShift_ != -1 ) x_nonconst[idxLeg2VisPtShift_] = 1.;
+  //     FOR TESTING ONLY !!!
+
   if ( verbosity_ >= 2 ) {
     std::cout << "<SVfitIntegrand::Eval(const double*)>:" << std::endl;
+    std::cout << " x = { ";
+    for ( unsigned iDimension = 0; iDimension < numDimensions_; ++iDimension ) {
+      std::cout << x[iDimension];
+      if ( iDimension < (numDimensions_ - 1) ) std::cout << ", ";
+    }
+    std::cout << " }" << std::endl;
   }
 
   // in case of initialization errors don't start to do anything
@@ -330,9 +348,9 @@ SVfitIntegrand::Eval(const double* x) const
     return 0.;
   } 
 
-  double visPtShift1 = ( idxLeg1VisPtShift_ != -1 && !leg1isLep_ ) ? 1./x[idxLeg1VisPtShift_] : 1.;
-  double visPtShift2 = ( idxLeg2VisPtShift_ != -1 && !leg2isLep_ ) ? 1./x[idxLeg2VisPtShift_] : 1.;
-  //std::cout << "visPtShift: leg1 = " << visPtShift1 << ", leg2 = " << visPtShift2 << std::endl;
+  double visPtShift1 = ( idxLeg1VisPtShift_ != -1 && !leg1isLep_ ) ? (1./x[idxLeg1VisPtShift_]) : 1.;
+  double visPtShift2 = ( idxLeg2VisPtShift_ != -1 && !leg2isLep_ ) ? (1./x[idxLeg2VisPtShift_]) : 1.;
+  if ( visPtShift1 < 1.e-2 || visPtShift2 < 1.e-2 ) return 0.;
 
   // compute four-vector of visible decay products for first tau
   double vis1Px = visPtShift1*measuredTauLepton1_.px();
@@ -354,12 +372,8 @@ SVfitIntegrand::Eval(const double* x) const
 
   // compute visible energy fractions for both taus
   assert(idxLeg1_X_ != -1);
-  double x1 = x[idxLeg1_X_];
-  //----------------------
-  // !!! ONLY FOR TESTING
-  //x1 = 0.481205;
-  // FOR TESTING ONLY !!!
-  //----------------------
+  double x1_dash = x[idxLeg1_X_];
+  double x1 = x1_dash/visPtShift1;
   if ( !(x1 >= 1.e-5 && x1 <= 1.) ) return 0.;
   
   assert(idxLeg2_t_ != -1);  
@@ -367,34 +381,16 @@ SVfitIntegrand::Eval(const double* x) const
   q2_ = mTest2_ + GammaH_times_mTest_*TMath::Tan(tk);
   if ( q2_ <= 0. ) return 0.;
 
-  mVis_ = (vis1P4 + vis2P4).mass();
-  mVis2_ = square(mVis_);
-  //if ( mVis2_ < 1.e-3*mTest2_ ) return 0.;
-  double x2 = mVis2_/(q2_*x1);
-  //----------------------
-  // !!! ONLY FOR TESTING
-  //x2 = 0.512932;
-  //q2_ = mVis2_/(x1*x2);
-  // FOR TESTING ONLY !!!
-  //----------------------
+  double x2_dash = mVis2_measured_/(q2_*x1_dash);
+  double x2 = x2_dash/visPtShift2;
   if ( !(x2 >= 1.e-5 && x2 <= 1.) ) return 0.;
 
   // compute neutrino and tau lepton four-vector for first tau
   double nu1En = vis1En*(1. - x1)/x1;
   double nu1Mass = ( idxLeg1_mNuNu_ != -1 ) ? TMath::Sqrt(x[idxLeg1_mNuNu_]) : 0.;
-  //----------------------
-  // !!! ONLY FOR TESTING
-  //nu1Mass = 0.644321;
-  // FOR TESTING ONLY !!!
-  //----------------------
   double nu1P = TMath::Sqrt(TMath::Max(0., nu1En*nu1En - square(nu1Mass)));
   assert(idxLeg1_phi_ != -1);  
   double phiNu1 = x[idxLeg1_phi_];
-  //----------------------
-  // !!! ONLY FOR TESTING
-  //phiNu1 = 0.651332;
-  // FOR TESTING ONLY !!!
-  //----------------------
   double cosThetaNu1 = compCosThetaNuNu(vis1En, vis1P, leg1Mass2_, nu1En, nu1P, square(nu1Mass));
   if ( !(cosThetaNu1 >= -1. && cosThetaNu1 <= +1.) ) return 0.;
   double thetaNu1 = TMath::ACos(cosThetaNu1);
@@ -417,19 +413,9 @@ SVfitIntegrand::Eval(const double* x) const
   // compute neutrino and tau lepton four-vector for second tau
   double nu2En = vis2En*(1. - x2)/x2;
   double nu2Mass = ( idxLeg2_mNuNu_ != -1 ) ? TMath::Sqrt(x[idxLeg2_mNuNu_]) : 0.;
-  //----------------------
-  // !!! ONLY FOR TESTING
-  //nu2Mass = 0.;
-  // FOR TESTING ONLY !!!
-  //----------------------
   double nu2P = TMath::Sqrt(TMath::Max(0., nu2En*nu2En - square(nu2Mass)));
   assert(idxLeg2_phi_ != -2);  
   double phiNu2 = x[idxLeg2_phi_];
-  //----------------------
-  // !!! ONLY FOR TESTING
-  //phiNu2 = 0.114703;
-  // FOR TESTING ONLY !!!
-  //----------------------
   double cosThetaNu2 = compCosThetaNuNu(vis2En, vis2P, leg2Mass2_, nu2En, nu2P, square(nu2Mass));
   if ( !(cosThetaNu2 >= -1. && cosThetaNu2 <= +1.) ) return 0.;
   double thetaNu2 = TMath::ACos(cosThetaNu2);
@@ -454,6 +440,10 @@ SVfitIntegrand::Eval(const double* x) const
   double sumNuPy = nu1Py + nu2Py;
   double residualX = measuredMETx_ - sumNuPx;
   double residualY = measuredMETy_ - sumNuPy;
+  if ( rhoHadTau_ != 0. ) {
+    residualX += (rhoHadTau_*((visPtShift1 - 1.)*measuredTauLepton1_.px() + (visPtShift2 - 1.)*measuredTauLepton2_.px()));
+    residualY += (rhoHadTau_*((visPtShift1 - 1.)*measuredTauLepton1_.py() + (visPtShift2 - 1.)*measuredTauLepton2_.py()));
+  }
   double pull2 = residualX*(invCovMETxx_*residualX + invCovMETxy_*residualY) + residualY*(invCovMETyx_*residualX + invCovMETyy_*residualY);
   double prob_TF_met = const_MET_*TMath::Exp(-0.5*pull2);
   if ( verbosity_ >= 2 ) {
@@ -627,11 +617,19 @@ SVfitIntegrand::Eval(const double* x) const
   // CV: multiply matrix element by factor (Pi/(mTau GammaTau))^2 from Luca's write-up
   prob_PS_and_tauDecay *= square(TMath::Pi()/(tauLeptonMass*GammaTau));
 
-  double jacobiFactor = (square(q2_ - mTest2_) + GammaH2_times_mTest2_)/GammaH_times_mTest_; // parametrization of q^2 by tk (Eq. 8 of arXiv:1010.2263 without factor 1/pi, as agreed with Luca and Andrew)
+  if ( q2_ <= 0. || x1_dash <= 0. ) return 0.;
+  double jacobiFactor = 1./(visPtShift1*visPtShift2);                                  // product of derrivatives dx1/dx1' and dx2/dx2' for parametrization of x1, x2 by x1', x2'
+  jacobiFactor *= mVis2_measured_/(square(q2_)*x1_dash);                               // derrivative dx2'/dq^2 for parametrization of x2' by q^2
+  jacobiFactor *= (square(q2_ - mTest2_) + GammaH2_times_mTest2_)/GammaH_times_mTest_; // parametrization of q^2 by tk (Eq. 8 of arXiv:1010.2263 without factor 1/pi, as agreed with Luca and Andrew)
   double prob = prob_flux*prob_PDF*prob_ME*prob_PS_and_tauDecay*prob_TF*jacobiFactor;
   if ( verbosity_ >= 2 ) {
     std::cout << "prob: flux = " << prob_flux << ", PDF = " << prob_PDF << ", ME = " << prob_ME << ", PS+decay = " << prob_PS_and_tauDecay << "," 
 	      << " TF = " << prob_TF << ", Jacobi = " << jacobiFactor << " --> returning " << prob << std::endl;
+  }
+  if ( TMath::IsNaN(prob) ) {
+    std::cerr << "Warning: prob = " << prob << " (flux = " << prob_flux << ", PDF = " << prob_PDF << ", ME = " << prob_ME << ", PS+decay = " << prob_PS_and_tauDecay << "," 
+	      << " TF = " << prob_TF << ", Jacobi = " << jacobiFactor << ") --> setting prob = 0 !!" << std::endl;
+    prob = 0.;
   }
 
   return prob;

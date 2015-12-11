@@ -92,9 +92,12 @@ int main(int argc, char* argv[])
   
   // define Higgs mass points 
   std::vector<double> mH;  
-  for ( double mH_i = 100.; mH_i <= 2500.; mH_i += 50. ) {
-    mH.push_back(mH_i);
-  }
+  //for ( double mH_i = 100.; mH_i <= 2500.; mH_i += 50. ) {
+  //  mH.push_back(mH_i);
+  //}
+  mH.push_back(100.);
+  mH.push_back(125.);
+  mH.push_back(150.);
 
   // CV: compare cross-sections computed using MadGraph 
   //     with values computed by LHC XS working-group
@@ -141,6 +144,12 @@ int main(int argc, char* argv[])
   xSection_times_BR_targets_14TeV[100.] = 2.446*29.68*branchingRatios[100.]/(2.446*29.68/25.759);
   xSection_times_BR_targets_14TeV[125.] = 2.587*19.27*branchingRatios[125.]/(2.587*19.27/17.317);
   xSection_times_BR_targets_14TeV[150.] = 2.720*13.55*branchingRatios[150.]/(2.720*13.55/12.448);
+  //-----------------------------------------------------------------------------
+  // CV: use LO cross-sections computed by HIGLU 4.31
+  xSection_times_BR_targets_14TeV[100.] = 25.5*branchingRatios[100.];
+  xSection_times_BR_targets_14TeV[125.] = 18.0*branchingRatios[125.];
+  xSection_times_BR_targets_14TeV[150.] = 13.4*branchingRatios[150.];
+  //-----------------------------------------------------------------------------
   xSection_times_BR_targets_14TeV[160.] = 2.771*11.96*branchingRatios[160.]/1.92;
   xSection_times_BR_targets_14TeV[200.] = 2.969*7.081*branchingRatios[200.]/(2.969*7.081/7.366);
   xSection_times_BR_targets_14TeV[250.] = 3.208*4.783*branchingRatios[250.]/(3.208*4.783/4.993);
@@ -240,8 +249,8 @@ int main(int argc, char* argv[])
 	int idxPoint = idxPoints[*intMode][*numCalls_i];
 	++idxPoints[*intMode][*numCalls_i];
 
-	//double branchingRatio = branchingRatios[*mH_i];
-	double branchingRatio = 1.e-1; // set Higgs -> tautau decay branching fraction to value used by SVfitIntegrand
+	double branchingRatio = branchingRatios[*mH_i];
+	//double branchingRatio = 1.e-1; // set Higgs -> tautau decay branching fraction to value used by SVfitIntegrand
 
 	std::cout << "without acceptance cuts:" << std::endl;    
 	HttXsectionWithTauDecays HttXsection_woAcc(sqrtS, *mH_i, pdfName.data(), mode, findFile(madgraphFileNames[*mH_i]), verbosity);
@@ -261,7 +270,8 @@ int main(int argc, char* argv[])
 	TGraphErrors* graph_Xsection_times_BR_woAcc = graphs_Xsection_times_BR_woAcc[*intMode][*numCalls_i];
 	graph_Xsection_times_BR_woAcc->SetPoint(idxPoint, *mH_i, xSection_times_BR);
 	graph_Xsection_times_BR_woAcc->SetPointError(idxPoint, 0., xSection_times_BRerr);
- 
+	continue;
+
 	std::cout << "with acceptance cuts:" << std::endl;
 	HttXsectionWithTauDecays HttXsection_wAcc(sqrtS, *mH_i, pdfName.data(), mode, findFile(madgraphFileNames[*mH_i]), verbosity);
 	HttXsection_wAcc.setBR(branchingRatio);

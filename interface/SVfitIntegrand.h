@@ -34,6 +34,7 @@ namespace svFitMEM
     void setIdxLeg2_phi(int idx) { idxLeg2_phi_ = idx; }
     void setIdxLeg2VisPtShift(int idx) { idxLeg2VisPtShift_ = idx; }
     void setIdxLeg2_mNuNu(int idx) { idxLeg2_mNuNu_ = idx; }
+    void setNumDimensions(unsigned numDimensions) { numDimensions_ = numDimensions; }
 
     void setMtest(double);
 
@@ -55,6 +56,12 @@ namespace svFitMEM
     void disableHadTauTF() 
     { 
       useHadTauTF_ = false; 
+    }
+
+    /// set correlation between hadronic tau pT and MET
+    void setRhoHadTau(double rhoHadTau) 
+    { 
+      rhoHadTau_ = rhoHadTau;
     }
 
     /// set momenta of visible tau decay products and of reconstructed missing transverse energy
@@ -99,8 +106,8 @@ namespace svFitMEM
 
     int mode_;
 
-    mutable double mVis_;
-    mutable double mVis2_;
+    mutable double mVis_measured_;
+    mutable double mVis2_measured_;
     double mTest_;
     double mTest2_;
     mutable double GammaH_;
@@ -130,6 +137,8 @@ namespace svFitMEM
     const HadTauTFBase* hadTauTF2_;
     bool useHadTauTF_;
 
+    double rhoHadTau_;
+
     int idxLeg1_X_;
     int idxLeg1_phi_;
     int idxLeg1VisPtShift_;
@@ -138,6 +147,7 @@ namespace svFitMEM
     int idxLeg2_phi_;
     int idxLeg2VisPtShift_;
     int idxLeg2_mNuNu_;
+    unsigned numDimensions_;
 
     LHAPDF::PDF* pdf_;
     bool pdfIsInitialized_;

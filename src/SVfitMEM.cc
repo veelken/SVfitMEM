@@ -6,6 +6,10 @@
 
 #include <TGraphErrors.h>
 #include <TH1.h>
+#include <TMatrixD.h>
+#include <TMatrixDSym.h>
+#include <TMatrixDSymEigen.h>
+#include <TVectorD.h>
 
 #include <algorithm>
 
@@ -203,6 +207,20 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
     std::cout << "MET: Px = " << measuredMETx_rounded << ", Py = " << measuredMETy_rounded << std::endl;
     std::cout << "covMET:" << std::endl;
     covMET_rounded.Print();
+    TMatrixDSym covMET_sym(2);
+    covMET_sym(0,0) = covMET_rounded[0][0];
+    covMET_sym(0,1) = covMET_rounded[0][1];
+    covMET_sym(1,0) = covMET_rounded[1][0];
+    covMET_sym(1,1) = covMET_rounded[1][1];
+    TMatrixD EigenVectors(2,2);
+    EigenVectors = TMatrixDSymEigen(covMET_sym).GetEigenVectors();
+    std::cout << "Eigenvectors =  { " << EigenVectors(0,0) << ", " << EigenVectors(1,0) << " (phi = " << TMath::ATan2(EigenVectors(1,0), EigenVectors(0,0)) << ") },"
+	      << " { " << EigenVectors(0,1) << ", " << EigenVectors(1,1) << " (phi = " << TMath::ATan2(EigenVectors(1,1), EigenVectors(0,1)) << ") }" << std::endl;
+    TVectorD EigenValues(2);  
+    EigenValues = TMatrixDSymEigen(covMET_sym).GetEigenValues();
+    EigenValues(0) = TMath::Sqrt(EigenValues(0));
+    EigenValues(1) = TMath::Sqrt(EigenValues(1));
+    std::cout << "Eigenvalues = " << EigenValues(0) << ", " << EigenValues(1) << std::endl;
   }
 
 //--- determine dimension of integration space 
@@ -263,6 +281,7 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
   integrand_->setIdxLeg2_phi(idxLeg2_phi);
   integrand_->setIdxLeg2VisPtShift(idxLeg2VisPtShift);
   integrand_->setIdxLeg2_mNuNu(idxLeg2_mNuNu);
+  integrand_->setNumDimensions(numDimensions_);
   SVfitIntegrand::gSVfitIntegrand = integrand_;
 
   if ( intMode_ == kMarkovChain ) {
@@ -300,7 +319,8 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
   xl_ = new double[numDimensions_];
   xu_ = new double[numDimensions_];
   xl_[idxLeg1_X] = 0.;
-  xu_[idxLeg1_X] = 1.;
+  //xu_[idxLeg1_X] = 1.;
+  xu_[idxLeg1_X] = 2.; // upper integration bound for x1' = visPtShift1*x1
   xl_[idxLeg1_phi] = -TMath::Pi();
   xu_[idxLeg1_phi] = +TMath::Pi();
   if ( idxLeg1VisPtShift != -1 ) {
@@ -323,9 +343,18 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
     xl_[idxLeg2_mNuNu] = 0.;
     xu_[idxLeg2_mNuNu] = tauLeptonMass2;
   }
-  if ( verbosity_ >= 2 ) { 
+  if ( verbosity_ >= 1 ) { 
     for ( unsigned iDimension = 0; iDimension < numDimensions_; ++iDimension ) {
-      std::cout << " fitParameter #" << iDimension << ": xl = " << xl_[iDimension] << ", xu = " << xu_[iDimension] << std::endl;
+      std::cout << " fitParameter #" << iDimension << ": xl = " << xl_[iDimension] << ", xu = " << xu_[iDimension];
+      if ( (int)iDimension == idxLeg1_X         ) std::cout << " (leg1:X)";
+      if ( (int)iDimension == idxLeg1_phi       ) std::cout << " (leg1:phi)";
+      if ( (int)iDimension == idxLeg1VisPtShift ) std::cout << " (leg1:VisPtShift)";
+      if ( (int)iDimension == idxLeg1_mNuNu     ) std::cout << " (leg1:mNuNu)";
+      if ( (int)iDimension == idxLeg2_t         ) std::cout << " (leg2:t)";
+      if ( (int)iDimension == idxLeg2_phi       ) std::cout << " (leg2:phi)";
+      if ( (int)iDimension == idxLeg2VisPtShift ) std::cout << " (leg2:VisPtShift)";
+      if ( (int)iDimension == idxLeg2_mNuNu     ) std::cout << " (leg2:mNuNu)";
+      std::cout << std::endl;
     }
   }
 
@@ -340,7 +369,9 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
 //--- call VEGAS routine (part of GNU scientific library)
 //    to perform actual integration
   const int numIter = 3;
-  for ( int idxIter = 0; idxIter < numIter; ++idxIter ) {
+  bool skipEvent = false;
+  unsigned numTestMassPoints = 0;
+  for ( int idxIter = 0; idxIter < numIter && !skipEvent; ++idxIter ) {
     double mTest_step;
     if      ( idxIter == 0 ) mTest_step = 1.1000;
     else if ( idxIter == 1 ) mTest_step = TMath::Power(1.1000, 1./4);
@@ -376,12 +407,7 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
 
     double mTest = 1.0125*mVis;
     if ( mTest < mTest_min ) mTest = mTest_min;
-    // !!! ONLY FOR TESTING
-    //mTest = 3200.;
-    //mTest_max = 3200.;
-    //if ( idxIter != 0 ) continue;
-    //     FOR TESTING ONLY !!!
-    while ( mTest <= mTest_max && !skipHighMassTail ) {
+    while ( mTest <= mTest_max && !skipHighMassTail && !skipEvent ) {
       if ( mTest_computed.find(TMath::Nint(mTest*1.e+2)) == mTest_computed.end() ) {
 	integrand_->setMtest(mTest);
 	
@@ -446,6 +472,12 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
 	    skipHighMassTail = true;
 	  }
 	} 
+	// CV: check if pMax is still 0 after 20 iterations;
+	//     if so, skip the event and set isValidSolution = false,
+	//     in order to safe computing time on events in which numerical integration is unreliable any way
+	if ( numTestMassPoints >= 20 && !(pMax > 0.) ) {
+	  skipEvent = true;
+	} 
 	
 	GraphPoint graphPoint;
 	graphPoint.x_ = mTest;
@@ -456,6 +488,7 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
 	graphPoints.push_back(graphPoint);
 
 	mTest_computed.insert(TMath::Nint(mTest*1.e+2));
+	++numTestMassPoints;
       }
       
       mTest *= mTest_step;
@@ -466,8 +499,9 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
 
   TGraphErrors* likelihoodGraph = makeGraph("svFitLikelihoodGraph", graphPoints);
   extractResult(likelihoodGraph, mass_, massErr_, Lmax_, verbosity_);
+  isValidSolution_ = ( Lmax_ > 0. ) ? true : false;
   if ( verbosity_ >= 1 ) {
-    std::cout << "--> M = " << mass_ << " +/- " << massErr_ << " (Lmax = " << Lmax_ << ")" << std::endl;
+    std::cout << "--> M = " << mass_ << " +/- " << massErr_ << " (Lmax = " << Lmax_ << ", isValidSolution = " << isValidSolution_ << ")" << std::endl;
   }
   
   if ( likelihoodFileName != "" ) {
@@ -485,5 +519,6 @@ SVfitMEM::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons, do
 
   if ( verbosity_ >= 1 ) {
     clock_->Show("<SVfitMEM::integrate>");
+    std::cout << " #mTest points = " << numTestMassPoints << std::endl;
   }
 }
