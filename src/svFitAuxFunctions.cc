@@ -80,7 +80,6 @@ void extractResult(TGraphErrors* graph, double& mass, double& massErr, double& L
       graphPoints_forFit.push_back(graphPoint);
     }
   }
-  //std::cout << "fit: xMin = " << xMin_fit << ", xMax = " << xMax_fit << std::endl;
 
   TGraphErrors* likelihoodGraph_forFit = makeGraph("svFitLikelihoodGraph_forFit", graphPoints_forFit);
   int numPoints = likelihoodGraph_forFit->GetN();
@@ -96,7 +95,7 @@ void extractResult(TGraphErrors* graph, double& mass, double& massErr, double& L
     TFitResultPtr fitResult = likelihoodGraph_forFit->Fit(fitFunction, fitOptions.data());
     if ( fitResult.Get() ) {
       if ( verbosity >= 1 ) {
-	std::cout << "fitResult:" << std::endl;
+	std::cout << "fitting graph of p versus M(test) in range " << xMin_fit << ".." << xMax_fit << ", result:" << std::endl;
 	std::cout << " parameter #0 = " << fitFunction->GetParameter(0) << " +/- " << fitFunction->GetParError(0) << std::endl;
 	std::cout << " parameter #1 = " << fitFunction->GetParameter(1) << " +/- " << fitFunction->GetParError(1) << std::endl;
 	std::cout << " parameter #2 = " << fitFunction->GetParameter(2) << " +/- " << fitFunction->GetParError(2) << std::endl;
