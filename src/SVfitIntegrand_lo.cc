@@ -1,0 +1,560 @@
+#include "TauAnalysis/SVfitMEM/interface/SVfitIntegrand_lo.h"
+
+#include "TauAnalysis/SVfitMEM/interface/svFitAuxFunctions.h"
+#include "TauAnalysis/SVfitMEM/interface/SVfitIntegratorMarkovChain.h"
+#include "TauAnalysis/SVfitMEM/interface/SVfitIntegratorVEGAS.h"
+
+#include <TMath.h>
+#include <TH1.h>
+#include <Math/VectorUtil.h>
+
+#include <math.h>
+
+using namespace svFitMEM;
+
+/// global function pointer, needed for VEGAS integration
+const SVfitIntegrand_lo* SVfitIntegrand_lo::gSVfitIntegrand = 0;
+
+SVfitIntegrand_lo::SVfitIntegrand_lo(double sqrtS, const std::string& pdfName, int mode, const std::string& madgraphFileName, int verbosity) 
+  : mode_(mode),
+    mTest_(0.),
+    mTest2_(0.),
+    GammaH_(1.e-2*mTest_),
+    GammaH_times_mTest_(GammaH_*mTest_),
+    GammaH2_times_mTest2_(square(GammaH_times_mTest_)),
+    sqrtS_(sqrtS),
+    s_(square(sqrtS_)),
+    invSqrtS_(1./sqrtS_),
+    beamAxis_(0., 0., 1.),
+    invCovMET_(2,2),
+    hadTauTF1_(0),
+    hadTauTF2_(0),
+    useHadTauTF_(false),
+    rhoHadTau_(0.),
+    idxLeg1_X_(-1),
+    idxLeg1_phi_(-1),
+    idxLeg1VisPtShift_(-1),
+    idxLeg1_mNuNu_(-1),
+    idxLeg2_t_(-1),
+    idxLeg2_phi_(-1),
+    idxLeg2VisPtShift_(-1),
+    idxLeg2_mNuNu_(-1),
+    numDimensions_(0),
+    pdf_(0),
+    pdfIsInitialized_(false),
+    me_madgraph_(false, true),
+    me_madgraph_isInitialized_(false),
+    me_lit_(pdfName, false, true),
+    errorCode_(0),
+    verbosity_(verbosity)
+{
+  if ( verbosity_ ) {
+    std::cout << "<SVfitIntegrand_lo::SVfitIntegrand_lo>:" << std::endl;
+  }
+
+  // initialize PDF set
+  if ( !pdfIsInitialized_ ) {
+    pdf_ = LHAPDF::mkPDF(pdfName.data(), 0);
+    pdfIsInitialized_ = true;
+  }
+
+  // initialize Madgraph
+  if ( madgraphFileName != "" ) {
+    me_madgraph_.initProc(madgraphFileName);
+    me_madgraph_isInitialized_ = true;
+  } else if ( mode == kMadgraph ) {
+    std::cerr << "Error in <SVfitIntegrand_lo>: No param.dat file for Madgraph given !!" << std::endl;
+    assert(0);
+  }
+  if ( mode_ == kMadgraph ) {
+    GammaH_ = me_madgraph_.getHiggsWidth();
+  }
+
+  me_lit_.setS(s_);
+  // set Higgs -> tautau decay branching fraction 
+  // to common value for all test-mass hypotheses
+  me_lit_.setBR(1.e-1); 
+
+  madgraphGluon1P4_ = new double[4];
+  madgraphGluon1P4_[1] = 0.;
+  madgraphGluon1P4_[2] = 0.;
+  madgraphMomenta_.push_back(madgraphGluon1P4_);
+  madgraphGluon2P4_ = new double[4];
+  madgraphGluon2P4_[1] = 0.;
+  madgraphGluon2P4_[2] = 0.;
+  madgraphMomenta_.push_back(madgraphGluon2P4_);
+  madgraphTau1P4_ = new double[4];
+  madgraphMomenta_.push_back(madgraphTau1P4_);
+  madgraphTau2P4_ = new double[4];
+  madgraphMomenta_.push_back(madgraphTau2P4_);
+
+  // set global function pointer to this
+  gSVfitIntegrand = this;
+}
+
+SVfitIntegrand_lo::~SVfitIntegrand_lo()
+{
+  std::cout << "<SVfitIntegrand_lo::~SVfitIntegrand_lo>:" << std::endl;
+  
+  delete hadTauTF1_;
+  delete hadTauTF2_;
+
+  delete pdf_;
+
+  delete [] madgraphGluon1P4_;
+  delete [] madgraphGluon2P4_;
+  delete [] madgraphTau1P4_;
+  delete [] madgraphTau2P4_;
+}
+
+void 
+SVfitIntegrand_lo::setMtest(double mTest) 
+{ 
+  // reset 'TestMass' error code
+  errorCode_ &= (errorCode_ ^ TestMass);
+  
+  if ( mTest < TMath::Sqrt(mVis2_measured_) ) {
+    std::cerr << "Error: Cannot have mTest < mVis = " << TMath::Sqrt(mVis2_measured_) << " !!" << std::endl;
+    errorCode_ |= TestMass;
+    return;
+  }
+  mTest_ = mTest; 
+  mTest2_ = square(mTest); 
+  GammaH_ = 1.e-2*mTest_;
+  GammaH_times_mTest_ = GammaH_*mTest_;
+  GammaH2_times_mTest2_ = square(GammaH_times_mTest_);
+}
+
+namespace
+{
+  double norm(const Vector& v)
+  {
+    return TMath::Sqrt(v.mag2());
+  }
+}
+
+void 
+SVfitIntegrand_lo::setInputs(const std::vector<MeasuredTauLepton>& measuredTauLeptons, double measuredMETx, double measuredMETy, const TMatrixD& covMET) 
+{
+  if ( verbosity_ ) {
+    std::cout << "<SVfitIntegrand_lo::setInputs>:" << std::endl;
+  }
+
+  // reset 'LeptonNumber' and 'MatrixInversion' error codes
+  errorCode_ &= (errorCode_ ^ LeptonNumber);
+  errorCode_ &= (errorCode_ ^ MatrixInversion);
+
+  if ( measuredTauLeptons.size() != 2 ) {
+    std::cerr << "Error: Number of MeasuredTauLeptons is not equal to two !!" << std::endl;
+    errorCode_ |= LeptonNumber;
+  }
+  measuredTauLepton1_ = measuredTauLeptons[0];
+  leg1isLep_ = measuredTauLepton1_.type() == MeasuredTauLepton::kTauToElecDecay || measuredTauLepton1_.type() == MeasuredTauLepton::kTauToMuDecay;
+  leg1Mass_ = measuredTauLepton1_.mass();
+  leg1Mass2_ = square(leg1Mass_);
+  Vector eZ1 = normalize(measuredTauLepton1_.p3());
+  Vector eY1 = normalize(compCrossProduct(eZ1, beamAxis_));
+  Vector eX1 = normalize(compCrossProduct(eY1, eZ1));
+  if ( verbosity_ >= 2 ) {
+    std::cout << "eX1: theta = " << eX1.theta() << ", phi = " << eX1.phi() << ", norm = " << norm(eX1) << std::endl;
+    std::cout << "eY1: theta = " << eY1.theta() << ", phi = " << eY1.phi() << ", norm = " << norm(eY1) << std::endl;
+    std::cout << "eZ1: theta = " << eZ1.theta() << ", phi = " << eZ1.phi() << ", norm = " << norm(eZ1) << std::endl;
+    std::cout << "(eX1 x eY1 = " << norm(compCrossProduct(eX1, eY1)) << ", eX1 x eZ1 = " << norm(compCrossProduct(eY1, eZ1)) << ", eY1 x eZ1 = " << norm(compCrossProduct(eY1, eZ1)) << ")" << std::endl;
+  }
+  leg1eX_x_ = eX1.x();
+  leg1eX_y_ = eX1.y();
+  leg1eX_z_ = eX1.z();
+  leg1eY_x_ = eY1.x();
+  leg1eY_y_ = eY1.y();
+  leg1eY_z_ = eY1.z();
+  leg1eZ_x_ = eZ1.x();
+  leg1eZ_y_ = eZ1.y();
+  leg1eZ_z_ = eZ1.z();
+
+  measuredTauLepton2_ = measuredTauLeptons[1];
+  leg2isLep_ = measuredTauLepton2_.type() == MeasuredTauLepton::kTauToElecDecay || measuredTauLepton2_.type() == MeasuredTauLepton::kTauToMuDecay;
+  leg2Mass_ = measuredTauLepton2_.mass();
+  leg2Mass2_ = square(leg2Mass_);
+  Vector eZ2 = normalize(measuredTauLepton2_.p3());
+  Vector eY2 = normalize(compCrossProduct(eZ2, beamAxis_));
+  Vector eX2 = normalize(compCrossProduct(eY2, eZ2));
+  if ( verbosity_ >= 2 ) {
+    std::cout << "eX2: theta = " << eX2.theta() << ", phi = " << eX2.phi() << ", norm = " << norm(eX2) << std::endl;
+    std::cout << "eY2: theta = " << eY2.theta() << ", phi = " << eY2.phi() << ", norm = " << norm(eY2) << std::endl;
+    std::cout << "eZ2: theta = " << eZ2.theta() << ", phi = " << eZ2.phi() << ", norm = " << norm(eZ2) << std::endl;
+    //std::cout << "(eX2 x eY2 = " << norm(compCrossProduct(eX2, eY2)) << ", eX2 x eZ2 = " << norm(compCrossProduct(eY2, eZ2)) << ", eY2 x eZ2 = " << norm(compCrossProduct(eY2, eZ2)) << ")" << std::endl;
+  }
+  leg2eX_x_ = eX2.x();
+  leg2eX_y_ = eX2.y();
+  leg2eX_z_ = eX2.z();
+  leg2eY_x_ = eY2.x();
+  leg2eY_y_ = eY2.y();
+  leg2eY_z_ = eY2.z();
+  leg2eZ_x_ = eZ2.x();
+  leg2eZ_y_ = eZ2.y();
+  leg2eZ_z_ = eZ2.z();
+
+  mVis_measured_ = (measuredTauLepton1_.p4() + measuredTauLepton2_.p4()).mass();
+  if ( verbosity_ >= 2 ) {
+    std::cout << "mVis = " << mVis_measured_ << std::endl;
+  }
+  mVis2_measured_ = square(mVis_measured_);
+
+  measuredMETx_ = measuredMETx;
+  measuredMETy_ = measuredMETy;
+
+  // determine transfer matrix for MET
+  invCovMET_ = covMET;
+  double covDet = invCovMET_.Determinant();
+  const_MET_ = 0.;
+  if ( covDet != 0 ) { 
+    invCovMET_.Invert(); 
+    invCovMETxx_ = invCovMET_(0,0);
+    invCovMETxy_ = invCovMET_(0,1);
+    invCovMETyx_ = invCovMET_(1,0);
+    invCovMETyy_ = invCovMET_(1,1);
+    const_MET_ = 1./(2.*TMath::Pi()*TMath::Sqrt(covDet));
+  } else{
+    std::cerr << "Error: Cannot invert MET covariance Matrix (det=0) !!" << std::endl;
+    errorCode_ |= MatrixInversion;
+  }
+
+  if ( useHadTauTF_ ) {
+    if ( measuredTauLepton1_.type() == MeasuredTauLepton::kTauToHadDecay ) { 
+      assert(hadTauTF1_);
+      hadTauTF1_->setDecayMode(measuredTauLepton1_.decayMode());
+    }
+    if ( measuredTauLepton2_.type() == MeasuredTauLepton::kTauToHadDecay ) { 
+      assert(hadTauTF2_);
+      hadTauTF2_->setDecayMode(measuredTauLepton2_.decayMode());
+    }
+  }
+}
+
+namespace
+{
+  //double compAngle(const svFitMEM::LorentzVector& p4Vis, const svFitMEM::LorentzVector& p4Nu)
+  //{
+  //  double angle = (p4Vis.px()*p4Nu.px() + p4Vis.py()*p4Nu.py() + p4Vis.pz()*p4Nu.pz())/(p4Vis.P()*p4Nu.P());
+  //  return angle;
+  //}
+  //
+  //double compPhiInvis(const svFitMEM::LorentzVector& p4Vis, const svFitMEM::LorentzVector& p4Nu)
+  //{
+  //  svFitMEM::Vector beamAxis(0., 0., 1.);
+  //  svFitMEM::Vector p3Vis(p4Vis.px(), p4Vis.py(), p4Vis.pz());
+  //  svFitMEM::Vector eZ = svFitMEM::normalize(p3Vis);
+  //  svFitMEM::Vector eY = svFitMEM::normalize(svFitMEM::compCrossProduct(eZ, beamAxis));
+  //  svFitMEM::Vector eX = svFitMEM::normalize(svFitMEM::compCrossProduct(eY, eZ));
+  //  svFitMEM::Vector p3Nu(p4Nu.px(), p4Nu.py(), p4Nu.pz());
+  //  double pxInvis = svFitMEM::compScalarProduct(p3Nu, eX);
+  //  double pyInvis = svFitMEM::compScalarProduct(p3Nu, eY);
+  //  double phiInvis = TMath::ATan2(pyInvis, pxInvis);
+  //  return phiInvis;
+  //}
+}
+
+double
+SVfitIntegrand_lo::Eval(const double* x) const 
+{
+  if ( verbosity_ >= 2 ) {
+    std::cout << "<SVfitIntegrand_lo::Eval(const double*)>:" << std::endl;
+    std::cout << " x = { ";
+    for ( unsigned iDimension = 0; iDimension < numDimensions_; ++iDimension ) {
+      std::cout << x[iDimension];
+      if ( iDimension < (numDimensions_ - 1) ) std::cout << ", ";
+    }
+    std::cout << " }" << std::endl;
+  }
+
+  // in case of initialization errors don't start to do anything
+  if ( errorCode_ != 0 ) { 
+    return 0.;
+  } 
+
+  double visPtShift1 = ( idxLeg1VisPtShift_ != -1 && !leg1isLep_ ) ? (1./x[idxLeg1VisPtShift_]) : 1.;
+  double visPtShift2 = ( idxLeg2VisPtShift_ != -1 && !leg2isLep_ ) ? (1./x[idxLeg2VisPtShift_]) : 1.;
+  if ( visPtShift1 < 1.e-2 || visPtShift2 < 1.e-2 ) return 0.;
+
+  // compute four-vector of visible decay products for first tau
+  double vis1Px = visPtShift1*measuredTauLepton1_.px();
+  double vis1Py = visPtShift1*measuredTauLepton1_.py();
+  double vis1Pz = visPtShift1*measuredTauLepton1_.pz();
+  double vis1En = TMath::Sqrt(square(vis1Px) + square(vis1Py) + square(vis1Pz) + leg1Mass2_);
+  //std::cout << "vis1: En = " << vis1En << ", Pt = " << TMath::Sqrt(vis1Px*vis1Px + vis1Py*vis1Py) << std::endl;
+  LorentzVector vis1P4(vis1Px, vis1Py, vis1Pz, vis1En);
+  double vis1P = vis1P4.P();
+
+  // compute four-vector of visible decay products for second tau
+  double vis2Px = visPtShift2*measuredTauLepton2_.px();
+  double vis2Py = visPtShift2*measuredTauLepton2_.py();
+  double vis2Pz = visPtShift2*measuredTauLepton2_.pz();
+  double vis2En = TMath::Sqrt(square(vis2Px) + square(vis2Py) + square(vis2Pz) + leg2Mass2_);
+  //std::cout << "vis2: En = " << vis2En << ", Pt = " << TMath::Sqrt(vis2Px*vis2Px + vis2Py*vis2Py) << std::endl;
+  LorentzVector vis2P4(vis2Px, vis2Py, vis2Pz, vis2En);
+  double vis2P = vis2P4.P();
+
+  // compute visible energy fractions for both taus
+  assert(idxLeg1_X_ != -1);
+  double x1_dash = x[idxLeg1_X_];
+  double x1 = x1_dash/visPtShift1;
+  if ( !(x1 >= 1.e-5 && x1 <= 1.) ) return 0.;
+  
+  assert(idxLeg2_t_ != -1);  
+  double tk = x[idxLeg2_t_];
+  q2_ = mTest2_ + GammaH_times_mTest_*TMath::Tan(tk);
+  if ( q2_ <= 0. ) return 0.;
+
+  double x2_dash = mVis2_measured_/(q2_*x1_dash);
+  double x2 = x2_dash/visPtShift2;
+  if ( !(x2 >= 1.e-5 && x2 <= 1.) ) return 0.;
+
+  // compute neutrino and tau lepton four-vector for first tau
+  double nu1En = vis1En*(1. - x1)/x1;
+  double nu1Mass = ( idxLeg1_mNuNu_ != -1 ) ? TMath::Sqrt(x[idxLeg1_mNuNu_]) : 0.;
+  double nu1P = TMath::Sqrt(TMath::Max(0., nu1En*nu1En - square(nu1Mass)));
+  assert(idxLeg1_phi_ != -1);  
+  double phiNu1 = x[idxLeg1_phi_];
+  double cosThetaNu1 = compCosThetaNuNu(vis1En, vis1P, leg1Mass2_, nu1En, nu1P, square(nu1Mass));
+  if ( !(cosThetaNu1 >= -1. && cosThetaNu1 <= +1.) ) return 0.;
+  double thetaNu1 = TMath::ACos(cosThetaNu1);
+  double nu1Px_local = nu1P*TMath::Cos(phiNu1)*TMath::Sin(thetaNu1);
+  double nu1Py_local = nu1P*TMath::Sin(phiNu1)*TMath::Sin(thetaNu1);
+  double nu1Pz_local = nu1P*TMath::Cos(thetaNu1);
+  double nu1Px = nu1Px_local*leg1eX_x_ + nu1Py_local*leg1eY_x_ + nu1Pz_local*leg1eZ_x_;
+  double nu1Py = nu1Px_local*leg1eX_y_ + nu1Py_local*leg1eY_y_ + nu1Pz_local*leg1eZ_y_;
+  double nu1Pz = nu1Px_local*leg1eX_z_ + nu1Py_local*leg1eY_z_ + nu1Pz_local*leg1eZ_z_;
+  //std::cout << "nu1: En = " << nu1En << ", Pt = " << TMath::Sqrt(nu1Px*nu1Px + nu1Py*nu1Py) << std::endl;
+  LorentzVector nu1P4(nu1Px, nu1Py, nu1Pz, nu1En);
+
+  double tau1En = vis1En + nu1En;
+  double tau1Px = vis1P4.px() + nu1Px;
+  double tau1Py = vis1P4.py() + nu1Py;
+  double tau1Pz = vis1P4.pz() + nu1Pz;
+  //std::cout << "tau1: En = " << tau1En << ", Pt = " << TMath::Sqrt(tau1Px*tau1Px + tau1Py*tau1Py) << std::endl;
+  LorentzVector tau1P4(tau1Px, tau1Py, tau1Pz, tau1En);
+
+  // compute neutrino and tau lepton four-vector for second tau
+  double nu2En = vis2En*(1. - x2)/x2;
+  double nu2Mass = ( idxLeg2_mNuNu_ != -1 ) ? TMath::Sqrt(x[idxLeg2_mNuNu_]) : 0.;
+  double nu2P = TMath::Sqrt(TMath::Max(0., nu2En*nu2En - square(nu2Mass)));
+  assert(idxLeg2_phi_ != -2);  
+  double phiNu2 = x[idxLeg2_phi_];
+  double cosThetaNu2 = compCosThetaNuNu(vis2En, vis2P, leg2Mass2_, nu2En, nu2P, square(nu2Mass));
+  if ( !(cosThetaNu2 >= -1. && cosThetaNu2 <= +1.) ) return 0.;
+  double thetaNu2 = TMath::ACos(cosThetaNu2);
+  double nu2Px_local = nu2P*TMath::Cos(phiNu2)*TMath::Sin(thetaNu2);
+  double nu2Py_local = nu2P*TMath::Sin(phiNu2)*TMath::Sin(thetaNu2);
+  double nu2Pz_local = nu2P*TMath::Cos(thetaNu2);
+  double nu2Px = nu2Px_local*leg2eX_x_ + nu2Py_local*leg2eY_x_ + nu2Pz_local*leg2eZ_x_;
+  double nu2Py = nu2Px_local*leg2eX_y_ + nu2Py_local*leg2eY_y_ + nu2Pz_local*leg2eZ_y_;
+  double nu2Pz = nu2Px_local*leg2eX_z_ + nu2Py_local*leg2eY_z_ + nu2Pz_local*leg2eZ_z_;
+  //std::cout << "nu2: En = " << nu2En << ", Pt = " << TMath::Sqrt(nu2Px*nu2Px + nu2Py*nu2Py) << std::endl;
+  LorentzVector nu2P4(nu2Px, nu2Py, nu2Pz, nu2En);
+
+  double tau2En = vis2En + nu2En;
+  double tau2Px = vis2P4.px() + nu2Px;
+  double tau2Py = vis2P4.py() + nu2Py;
+  double tau2Pz = vis2P4.pz() + nu2Pz;
+  //std::cout << "tau2: En = " << tau2En << ", Pt = " << TMath::Sqrt(tau2Px*tau2Px + tau2Py*tau2Py) << std::endl;
+  LorentzVector tau2P4(tau2Px, tau2Py, tau2Pz, tau2En);
+
+  // evaluate transfer function for MET/hadronic recoil
+  double sumNuPx = nu1Px + nu2Px;
+  double sumNuPy = nu1Py + nu2Py;
+  double residualX = measuredMETx_ - sumNuPx;
+  double residualY = measuredMETy_ - sumNuPy;
+  if ( rhoHadTau_ != 0. ) {
+    residualX += (rhoHadTau_*((visPtShift1 - 1.)*measuredTauLepton1_.px() + (visPtShift2 - 1.)*measuredTauLepton2_.px()));
+    residualY += (rhoHadTau_*((visPtShift1 - 1.)*measuredTauLepton1_.py() + (visPtShift2 - 1.)*measuredTauLepton2_.py()));
+  }
+  double pull2 = residualX*(invCovMETxx_*residualX + invCovMETxy_*residualY) + residualY*(invCovMETyx_*residualX + invCovMETyy_*residualY);
+  double prob_TF_met = const_MET_*TMath::Exp(-0.5*pull2);
+  if ( verbosity_ >= 2 ) {
+    std::cout << "TF(met): recPx = " << measuredMETx_ << ", recPy = " << measuredMETy_ << ", genPx = " << sumNuPx << ", genPy = " << sumNuPy << " --> prob = " << prob_TF_met << std::endl;
+    std::cout << "leg1: En = " << vis1P4.energy() << ", Px = " << vis1P4.px() << ", Py = " << vis1P4.py() << ", Pz = " << vis1P4.pz() << ";"
+	      << " Pt = " << vis1P4.pt() << ", eta = " << vis1P4.eta() << ", phi = " << vis1P4.phi() << ", mass = " << vis1P4.mass() 
+	      << " (x = " << x1 << ")" << std::endl;
+    std::cout << "tau1: En = " << tau1P4.energy() << ", Px = " << tau1P4.px() << ", Py = " << tau1P4.py() << ", Pz = " << tau1P4.pz() << ";"
+	      << " Pt = " << tau1P4.pt() << ", eta = " << tau1P4.eta() << ", phi = " << tau1P4.phi() << std::endl;
+    std::cout << "nu1: En = " << nu1P4.energy() << ", Px = " << nu1P4.px() << ", Py = " << nu1P4.py() << ", Pz = " << nu1P4.pz() << ";"
+	      << " Pt = " << nu1P4.pt() << ", eta = " << nu1P4.eta() << ", phi = " << nu1P4.phi() << ", mass = " << nu1P4.mass() << std::endl;
+    //double angle1 = compAngle(vis1P4, nu1P4);
+    //std::cout << "angle(vis1, nu1) = " << angle1 << std::endl;
+    //double phiInvis1 = compPhiInvis(vis1P4, nu1P4);
+    //std::cout << "phiInvis1 = " << phiInvis1 << std::endl;
+    std::cout << "leg2: En = " << vis2P4.energy() << ", Px = " << vis2P4.px() << ", Py = " << vis2P4.py() << ", Pz = " << vis2P4.pz() << ";"
+	      << " Pt = " << vis2P4.pt() << ", eta = " << vis2P4.eta() << ", phi = " << vis2P4.phi() << ", mass = " << vis2P4.mass() 
+	      << " (x = " << x2 << ")" << std::endl;
+    std::cout << "tau2: En = " << tau2P4.energy() << ", Px = " << tau2P4.px() << ", Py = " << tau2P4.py() << ", Pz = " << tau2P4.pz() << ";"
+	      << " Pt = " << tau2P4.pt() << ", eta = " << tau2P4.eta() << ", phi = " << tau2P4.phi() << std::endl;
+    std::cout << "nu2: En = " << nu2P4.energy() << ", Px = " << nu2P4.px() << ", Py = " << nu2P4.py() << ", Pz = " << nu2P4.pz() << ";"
+	      << " Pt = " << nu2P4.pt() << ", eta = " << nu2P4.eta() << ", phi = " << nu2P4.phi() << ", mass = " << nu2P4.mass() << std::endl;
+    //double angle2 = compAngle(vis2P4, nu2P4);
+    //std::cout << "angle(vis2, nu2) = " << angle2 << std::endl;
+    //double phiInvis2 = compPhiInvis(vis2P4, nu2P4);
+    //std::cout << "phiInvis2 = " << phiInvis2 << std::endl;
+  }
+  double prob_TF = prob_TF_met;
+
+  // evaluate transfer functions for tau energy reconstruction
+  if ( useHadTauTF_ && idxLeg1VisPtShift_ != -1 && !leg1isLep_ ) {
+    double prob_TF_leg1 = (*hadTauTF1_)(measuredTauLepton1_.pt(), vis1P4.pt(), vis1P4.eta());
+    if ( verbosity_ >= 2 ) {
+      std::cout << "TF(leg1): recPt = " << measuredTauLepton1_.pt() << ", genPt = " << vis1P4.pt() << ", genEta = " << vis1P4.eta() << " --> prob = " << prob_TF_leg1 << std::endl;    
+    }
+    prob_TF *= prob_TF_leg1;
+  }
+  if ( useHadTauTF_ && idxLeg2VisPtShift_ != -1 && !leg2isLep_ ) {
+    double prob_TF_leg2 = (*hadTauTF2_)(measuredTauLepton2_.pt(), vis2P4.pt(), vis2P4.eta());
+    if ( verbosity_ >= 2 ) {
+      std::cout << "TF(leg2): recPt = " << measuredTauLepton2_.pt() << ", genPt = " << vis2P4.pt() << ", genEta = " << vis2P4.eta() << " --> prob = " << prob_TF_leg2 << std::endl;
+    }
+    prob_TF *= prob_TF_leg2;    
+  }
+
+  // perform boost into MEM frame 
+  double memFramePx = tau1Px + tau2Px;
+  double memFramePy = tau1Py + tau2Py;
+  double memFrameEn = tau1En + tau2En;
+  Vector boost(-memFramePx/memFrameEn, -memFramePy/memFrameEn, 0.);
+  //std::cout << "boost: Px = " << boost.x() << ", Py = " << boost.y() << ", Pz = " << boost.z() << std::endl;
+  LorentzVector tau1P4_mem = ROOT::Math::VectorUtil::boost(tau1P4, boost); 
+  LorentzVector tau2P4_mem = ROOT::Math::VectorUtil::boost(tau2P4, boost); 
+  if ( verbosity_ >= 3 ) {
+    std::cout << "lab:" << std::endl;
+    std::cout << " tau1: Pt = " << tau1P4.pt() << ", eta = " << tau1P4.eta() << ", phi = " << tau1P4.phi() << ", mass = " << tau1P4.mass() << std::endl;
+    std::cout << "      (En = " << tau1P4.energy() << ", Px = " << tau1P4.px() << ", Py = " << tau1P4.py() << ", Pz = " << tau1P4.pz() << ")" << std::endl;    
+    std::cout << " tau2: Pt = " << tau2P4.pt() << ", eta = " << tau2P4.eta() << ", phi = " << tau2P4.phi() << ", mass = " << tau2P4.mass() << std::endl;
+    std::cout << "      (En = " << tau2P4.energy() << ", Px = " << tau2P4.px() << ", Py = " << tau2P4.py() << ", Pz = " << tau2P4.pz() << ")" << std::endl;  
+    LorentzVector ditauP4 = tau1P4 + tau2P4;
+    std::cout << " ditau: Pt = " << ditauP4.pt() << ", eta = " << ditauP4.eta() << ", phi = " << ditauP4.phi() << ", mass = " << ditauP4.mass() << std::endl;
+    std::cout << "      (En = " << ditauP4.energy() << ", Px = " << ditauP4.px() << ", Py = " << ditauP4.py() << ", Pz = " << ditauP4.pz() << ")" << std::endl; 
+    std::cout << "mem:" << std::endl;
+    std::cout << " tau1: Pt = " << tau1P4_mem.pt() << ", eta = " << tau1P4_mem.eta() << ", phi = " << tau1P4_mem.phi() << ", mass = " << tau1P4_mem.mass() << std::endl;
+    std::cout << "      (En = " << tau1P4_mem.energy() << ", Px = " << tau1P4_mem.px() << ", Py = " << tau1P4_mem.py() << ", Pz = " << tau1P4_mem.pz() << ")" << std::endl;  
+    std::cout << " tau2: Pt = " << tau2P4_mem.pt() << ", eta = " << tau2P4_mem.eta() << ", phi = " << tau2P4_mem.phi() << ", mass = " << tau2P4_mem.mass() << std::endl;
+    std::cout << "      (En = " << tau2P4_mem.energy() << ", Px = " << tau2P4_mem.px() << ", Py = " << tau2P4_mem.py() << ", Pz = " << tau2P4_mem.pz() << ")" << std::endl;  
+    LorentzVector ditauP4_mem = tau1P4_mem + tau2P4_mem;
+    std::cout << " ditau: Pt = " << ditauP4_mem.pt() << ", eta = " << ditauP4_mem.eta() << ", phi = " << ditauP4_mem.phi() << ", mass = " << ditauP4_mem.mass() << std::endl;
+    std::cout << "      (En = " << ditauP4_mem.energy() << ", Px = " << ditauP4_mem.px() << ", Py = " << ditauP4_mem.py() << ", Pz = " << ditauP4_mem.pz() << ")" << std::endl; 
+  }
+
+  // compute Bjorken-x of incoming protons and evaluate PDF factor
+  LorentzVector ditauP4 = tau1P4_mem + tau2P4_mem;
+  double ditauPz = ditauP4.pz();
+  double ditauEn = ditauP4.E();
+  double ditauMass = ditauP4.mass();
+  //if ( !(ditauMass > 0.70*mTest_ && ditauMass < 1.30*mTest_) ) return 0.;
+  //std::cout << "ditau: En = " << ditauEn << ", Pz = " << ditauPz << std::endl;
+  // CV: assume hadronic recoil to have only transverse momentum and no longitudinal momentum
+  //double hadRecoilEn = ditauP4.pt();
+  double hadRecoilEn = 0.;
+  double hadRecoilPz = 0.;
+  double xa = invSqrtS_*(ditauEn + ditauPz + hadRecoilEn + hadRecoilPz);
+  double xb = invSqrtS_*(ditauEn - ditauPz + hadRecoilEn - hadRecoilPz); 
+  //std::cout << "xa = " << xa << ", xb = " << xb << std::endl;
+  if ( xa <= 0. || xa >= 1. ) return 0.;
+  if ( xb <= 0. || xb >= 1. ) return 0.;
+  //double Q = mTest_;
+  double Q = ditauMass;
+  assert(pdfIsInitialized_);
+  double fa = pdf_->xfxQ(21, xa, Q)/xa; // gluon distribution
+  double fb = pdf_->xfxQ(21, xb, Q)/xb;
+  double prob_PDF = (fa*fb);
+
+  // evaluate flux factor
+  double prob_flux = (1./(s_*xa*xb));  
+
+  // evaluate LO matrix element, 
+  // computed by Madgraph or taken from literature 
+  madgraphGluon1P4_[0] =  0.5*xa*sqrtS_; 
+  madgraphGluon1P4_[3] = +0.5*xa*sqrtS_;
+  madgraphGluon2P4_[0] =  0.5*xb*sqrtS_;
+  madgraphGluon2P4_[3] = -0.5*xb*sqrtS_;
+  madgraphTau1P4_[0] = tau1P4_mem.energy();
+  madgraphTau1P4_[1] = tau1P4_mem.px();
+  madgraphTau1P4_[2] = tau1P4_mem.py();
+  madgraphTau1P4_[3] = tau1P4_mem.pz();
+  madgraphTau2P4_[0] = tau2P4_mem.energy();
+  madgraphTau2P4_[1] = tau2P4_mem.px();
+  madgraphTau2P4_[2] = tau2P4_mem.py();
+  madgraphTau2P4_[3] = tau2P4_mem.pz();
+  double prob_ME_madgraph = -1.;
+  if ( me_madgraph_isInitialized_ ) {
+    me_madgraph_.setMomenta(madgraphMomenta_);
+    me_madgraph_.sigmaKin();
+    prob_ME_madgraph = me_madgraph_.getMatrixElements()[0];
+    if ( TMath::IsNaN(prob_ME_madgraph) ) {
+      std::cerr << "Warning: Magraph returned NaN --> skipping event !!" << std::endl;
+      std::cerr << " tau1: Pt = " << tau1P4.pt() << ", eta = " << tau1P4.eta() << ", phi = " << tau1P4.phi() << ", mass = " << tau1P4.mass() << std::endl;
+      std::cerr << " tau2: Pt = " << tau2P4.pt() << ", eta = " << tau2P4.eta() << ", phi = " << tau2P4.phi() << ", mass = " << tau2P4.mass() << std::endl;
+      return 0.;
+    }
+  }
+  me_lit_.setHiggsMass(mTest_);
+  me_lit_.setHiggsWidth(GammaH_);
+  me_lit_.setMomenta(madgraphMomenta_);
+  double prob_ME_lit = me_lit_.getMatrixElement();
+  if ( verbosity_ >= 2 ) {
+    std::cout << "prob_ME: madgraph = " << prob_ME_madgraph << ", lit = " << prob_ME_lit << std::endl;
+  }
+  double prob_ME = 0.;
+  if ( mode_ == kMadgraph ) {
+    prob_ME = prob_ME_madgraph;
+  } else if ( mode_ == kLiterature ) {
+    prob_ME = prob_ME_lit;
+  } else {
+    assert(0);
+  }
+  assert(prob_ME >= 0.);
+  
+  const double conversionFactor = 1.e+10*square(hbar_c); // conversion factor from GeV^-2 to picobarn = 10^-40m
+  const double constFactor = 2.*conversionFactor/eigth(2.*TMath::Pi());
+  double prob_PS_and_tauDecay = constFactor/s_;
+  LorentzVector vis1P4_mem = ROOT::Math::VectorUtil::boost(vis1P4, boost); 
+  //LorentzVector nu1P4_mem  = ROOT::Math::VectorUtil::boost(nu1P4, boost); 
+  double x1_mem = vis1P4_mem.energy()/tau1P4_mem.energy();
+  if ( !(x1_mem >= 1.e-5 && x1_mem <= 1.) ) return 0.;
+  LorentzVector vis2P4_mem = ROOT::Math::VectorUtil::boost(vis2P4, boost); 
+  //LorentzVector nu2P4_mem  = ROOT::Math::VectorUtil::boost(nu2P4, boost); 
+  double x2_mem = vis2P4_mem.energy()/tau2P4_mem.energy();
+  if ( !(x2_mem >= 1.e-5 && x2_mem <= 1.) ) return 0.;
+  double prob_tauDecay_leg1 = 0.;
+  if ( leg1isLep_ ) {
+    //prob_tauDecay_leg1 = compPSfactor_tauToLepDecay(x1_mem, vis1P4_mem.E(), vis1P4_mem.P(), leg1Mass_, nu1P4_mem.E(), nu1P4_mem.P(), nu1Mass);
+    prob_tauDecay_leg1 = compPSfactor_tauToLepDecay(x1, vis1P4.E(), vis1P4.P(), leg1Mass_, nu1P4.E(), nu1P4.P(), nu1Mass);
+  } else {
+    //prob_tauDecay_leg1 = compPSfactor_tauToHadDecay(x1_mem, vis1P4_mem.E(), vis1P4_mem.P(), leg1Mass_, nu1P4_mem.E(), nu1P4_mem.P());
+    prob_tauDecay_leg1 = compPSfactor_tauToHadDecay(x1, vis1P4.E(), vis1P4.P(), leg1Mass_, nu1P4.E(), nu1P4.P());
+  }  
+  prob_PS_and_tauDecay *= prob_tauDecay_leg1;
+  double prob_tauDecay_leg2 = 0.;
+  if ( leg2isLep_ ) {
+    //prob_tauDecay_leg2 = compPSfactor_tauToLepDecay(x2_mem, vis2P4_mem.E(), vis2P4_mem.P(), leg2Mass_, nu2P4_mem.E(), nu2P4_mem.P(), nu2Mass);
+    prob_tauDecay_leg2 = compPSfactor_tauToLepDecay(x2, vis2P4.E(), vis2P4.P(), leg2Mass_, nu2P4.E(), nu2P4.P(), nu2Mass);
+  } else {
+    //prob_tauDecay_leg2 = compPSfactor_tauToHadDecay(x2_mem, vis2P4_mem.E(), vis2P4_mem.P(), leg2Mass_, nu2P4_mem.E(), nu2P4_mem.P());
+    prob_tauDecay_leg2 = compPSfactor_tauToHadDecay(x2, vis2P4.E(), vis2P4.P(), leg2Mass_, nu2P4.E(), nu2P4.P());
+  }
+  prob_PS_and_tauDecay *= prob_tauDecay_leg2;
+  // CV: multiply matrix element by factor (Pi/(mTau GammaTau))^2 from Luca's write-up
+  prob_PS_and_tauDecay *= square(TMath::Pi()/(tauLeptonMass*GammaTau));
+
+  if ( q2_ <= 0. || x1_dash <= 0. ) return 0.;
+  double jacobiFactor = 1./(visPtShift1*visPtShift2);                                  // product of derrivatives dx1/dx1' and dx2/dx2' for parametrization of x1, x2 by x1', x2'
+  jacobiFactor *= mVis2_measured_/(square(q2_)*x1_dash);                               // derrivative dx2'/dq^2 for parametrization of x2' by q^2
+  jacobiFactor *= (square(q2_ - mTest2_) + GammaH2_times_mTest2_)/GammaH_times_mTest_; // parametrization of q^2 by tk (Eq. 8 of arXiv:1010.2263 without factor 1/pi, as agreed with Luca and Andrew)
+  double prob = prob_flux*prob_PDF*prob_ME*prob_PS_and_tauDecay*prob_TF*jacobiFactor;
+  if ( verbosity_ >= 2 ) {
+    std::cout << "prob: flux = " << prob_flux << ", PDF = " << prob_PDF << ", ME = " << prob_ME << ", PS+decay = " << prob_PS_and_tauDecay << "," 
+	      << " TF = " << prob_TF << ", Jacobi = " << jacobiFactor << " --> returning " << prob << std::endl;
+  }
+  if ( TMath::IsNaN(prob) ) {
+    std::cerr << "Warning: prob = " << prob << " (flux = " << prob_flux << ", PDF = " << prob_PDF << ", ME = " << prob_ME << ", PS+decay = " << prob_PS_and_tauDecay << "," 
+	      << " TF = " << prob_TF << ", Jacobi = " << jacobiFactor << ") --> setting prob = 0 !!" << std::endl;
+    prob = 0.;
+  }
+
+  return prob;
+}

@@ -114,6 +114,10 @@ namespace svFitMEM
   Vector normalize(const Vector&);
   double compScalarProduct(const Vector&, const Vector&);
   Vector compCrossProduct(const Vector&, const Vector&);
+
+  double compCosThetaNuNu(double, double, double, double, double, double);
+  double compPSfactor_tauToLepDecay(double, double, double, double, double, double, double);
+  double compPSfactor_tauToHadDecay(double, double, double, double, double, double);
 }
 
 #endif

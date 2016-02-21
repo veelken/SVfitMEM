@@ -188,18 +188,18 @@ void makeSVfitMEM_xSection_times_AccGraphs()
   std::string inputFilePath = "/afs/cern.ch/user/v/veelken/scratch0/SVfitMEM_with_vamp/CMSSW_7_4_6/src/TauAnalysis/SVfitMEM/macros/data/";
 
   std::map<int, std::map<int, std::map<std::string, std::string> > > inputFileNames; // key = selLeg1decayMode, selLeg2decayMode, sqrtS
-  inputFileNames[1][1]["lo_13TeV"] = "compSVfitMEM_xSection_times_Acc_lo_13TeV_hadhad_vamp_all_2016Feb20.root";
-  inputFileNames[1][2]["lo_13TeV"] = "compSVfitMEM_xSection_times_Acc_lo_13TeV_hadlep_vamp_all_2016Feb20.root";
-  inputFileNames[2][1]["lo_13TeV"] = "compSVfitMEM_xSection_times_Acc_lo_13TeV_lephad_vamp_all_2016Feb20.root";
-  inputFileNames[2][2]["lo_13TeV"] = "compSVfitMEM_xSection_times_Acc_lo_13TeV_leplep_vamp_all_2016Feb20.root";
-  //inputFileNames[1][1]["nlo_13TeV"] = "compSVfitMEM_xSection_times_Acc_nlo_13TeV_hadhad_vamp_all_2016Feb20.root";
-  //inputFileNames[1][2]["nlo_13TeV"] = "compSVfitMEM_xSection_times_Acc_nlo_13TeV_hadlep_vamp_all_2016Feb20.root";
-  //inputFileNames[2][1]["nlo_13TeV"] = "compSVfitMEM_xSection_times_Acc_nlo_13TeV_lephad_vamp_all_2016Feb20.root";
-  //inputFileNames[2][2]["nlo_13TeV"] = "compSVfitMEM_xSection_times_Acc_nlo_13TeV_leplep_vamp_all_2016Feb20.root";
+  inputFileNames[1][1]["8TeV"] = "compSVfitMEM_xSection_times_Acc_8TeV_hadhad_vamp_all.root";
+  inputFileNames[1][2]["8TeV"] = "compSVfitMEM_xSection_times_Acc_8TeV_hadlep_vamp_all.root";
+  inputFileNames[2][1]["8TeV"] = "compSVfitMEM_xSection_times_Acc_8TeV_lephad_vamp_all.root";
+  inputFileNames[2][2]["8TeV"] = "compSVfitMEM_xSection_times_Acc_8TeV_leplep_vamp_all.root";
+  inputFileNames[1][1]["13TeV"] = "compSVfitMEM_xSection_times_Acc_13TeV_hadhad_vamp_all.root";
+  inputFileNames[1][2]["13TeV"] = "compSVfitMEM_xSection_times_Acc_13TeV_hadlep_vamp_all.root";
+  inputFileNames[2][1]["13TeV"] = "compSVfitMEM_xSection_times_Acc_13TeV_lephad_vamp_all.root";
+  inputFileNames[2][2]["13TeV"] = "compSVfitMEM_xSection_times_Acc_13TeV_leplep_vamp_all.root";
 
   std::vector<std::string> center_of_mass_energies;
-  center_of_mass_energies.push_back("lo_13TeV");
-  //center_of_mass_energies.push_back("nlo_13TeV");
+  center_of_mass_energies.push_back("8TeV");
+  center_of_mass_energies.push_back("13TeV");
 
   for ( std::vector<std::string>::const_iterator sqrtS = center_of_mass_energies.begin(); sqrtS != center_of_mass_energies.end(); ++sqrtS ) {
     

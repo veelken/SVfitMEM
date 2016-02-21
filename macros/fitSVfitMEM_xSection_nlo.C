@@ -79,7 +79,7 @@ TGraphErrors* makeFittedGraph(const TGraphErrors* graph, const TF1* fitFunction1
   std::cout << "<makeFittedGraph>:" << std::endl;
 
   TString graphName_fitted = Form("%s_fitted", graph->GetName());
-  //graphName_fitted = graphName_fitted.ReplaceAll("13TeV", "13TeV_lo");
+  graphName_fitted = graphName_fitted.ReplaceAll("13TeV", "13TeV_nlo");
   TGraphErrors* graph_fitted = (TGraphErrors*)graph->Clone(graphName_fitted.Data());
   graph_fitted->SetMarkerColor(8);
   graph_fitted->SetLineColor(8);
@@ -189,12 +189,12 @@ void showGraph(double canvasSizeX, double canvasSizeY,
   delete canvas;  
 }
 
-void fitSVfitMEM_xSection_lo()
+void fitSVfitMEM_xSection_nlo()
 {
   gROOT->SetBatch(true);
 
-  std::string inputFilePath = "/afs/cern.ch/user/v/veelken/scratch0/SVfitMEM_with_vamp/CMSSW_7_4_6/src/TauAnalysis/SVfitMEM/macros/";
-  std::string inputFileName = "makeSVfitMEM_xSection_times_AccGraphs_lo_13TeV.root";
+  std::string inputFilePath = "/afs/cern.ch/user/v/veelken/scratch0/SVfitMEM_with_vamp/CMSSW_7_4_6/src/TauAnalysis/SVfitMEM/data/";
+  std::string inputFileName = "svFitMEM_xSection_and_AccCorr_13TeV_lo.root";
   std::string inputFileName_full = Form("%s%s", inputFilePath.data(), inputFileName.data());
   TFile* inputFile = new TFile(inputFileName_full.data());
   if ( !inputFile ) {
@@ -209,16 +209,16 @@ void fitSVfitMEM_xSection_lo()
   channels.push_back("leplep");
 
   std::map<std::string, std::string> graphNames_xSection_woAcc; // key = channel
-  graphNames_xSection_woAcc["hadhad"] = "graph_Xsection_woAcc_lo_13TeV_hadhad_vamp";
-  graphNames_xSection_woAcc["lephad"] = "graph_Xsection_woAcc_lo_13TeV_lephad_vamp";
-  graphNames_xSection_woAcc["hadlep"] = "graph_Xsection_woAcc_lo_13TeV_hadlep_vamp";
-  graphNames_xSection_woAcc["leplep"] = "graph_Xsection_woAcc_lo_13TeV_leplep_vamp";
+  graphNames_xSection_woAcc["hadhad"] = "graph_Xsection_woAcc_13TeV_hadhad_vamp";
+  graphNames_xSection_woAcc["lephad"] = "graph_Xsection_woAcc_13TeV_lephad_vamp";
+  graphNames_xSection_woAcc["hadlep"] = "graph_Xsection_woAcc_13TeV_hadlep_vamp";
+  graphNames_xSection_woAcc["leplep"] = "graph_Xsection_woAcc_13TeV_leplep_vamp";
 
   std::map<std::string, std::string> graphNames_Acc; // key = channel
-  graphNames_Acc["hadhad"] = "graph_Acc_lo_13TeV_hadhad_vamp";
-  graphNames_Acc["lephad"] = "graph_Acc_lo_13TeV_lephad_vamp";
-  graphNames_Acc["hadlep"] = "graph_Acc_lo_13TeV_hadlep_vamp";
-  graphNames_Acc["leplep"] = "graph_Acc_lo_13TeV_leplep_vamp";
+  graphNames_Acc["hadhad"] = "graph_Acc_13TeV_hadhad_vamp";
+  graphNames_Acc["lephad"] = "graph_Acc_13TeV_lephad_vamp";
+  graphNames_Acc["hadlep"] = "graph_Acc_13TeV_hadlep_vamp";
+  graphNames_Acc["leplep"] = "graph_Acc_13TeV_leplep_vamp";
   
   double fitFunction1_xSection_woAcc_xMin = 5.e+1;
   double fitFunction1_xSection_woAcc_xMax = 3.e+2;
@@ -336,7 +336,7 @@ void fitSVfitMEM_xSection_lo()
 
     TGraphErrors* graph_xSection_woAcc_fitted = makeFittedGraph(graph_xSection_woAcc, fitFunction1_xSection_woAcc, fitFunction2_xSection_woAcc, fitFunction3_xSection_woAcc);
 
-    std::string outputFileName_xSection_woAcc = Form("./plots/fitSVfitMEM_lo_xSection_woAcc_%s.pdf", channel->data());
+    std::string outputFileName_xSection_woAcc = Form("./plots/fitSVfitMEM_nlo_xSection_woAcc_%s.pdf", channel->data());
     showGraph(800, 650,
 	      graph_xSection_woAcc, 
 	      fitFunction1_xSection_woAcc, fitFunction2_xSection_woAcc, fitFunction3_xSection_woAcc,
@@ -450,19 +450,19 @@ void fitSVfitMEM_xSection_lo()
 
     TGraphErrors* graph_Acc_fitted = makeFittedGraph(graph_Acc, fitFunction1_Acc, fitFunction2_Acc, fitFunction3_Acc);
 
-    std::string outputFileName_Acc = Form("./plots/fitSVfitMEM_lo_Acc_%s.pdf", channel->data());
+    std::string outputFileName_Acc = Form("./plots/fitSVfitMEM_nlo_Acc_%s.pdf", channel->data());
     showGraph(800, 650,
 	      graph_Acc, 
 	      fitFunction1_Acc, fitFunction2_Acc, fitFunction3_Acc, 
 	      graph_Acc_fitted, 
 	      false, 50., 5000., "m_{H} [GeV]", 1.30,
-	      false, 0., 1., "Acceptance", 1.35,
+	      false, 0., 0.8, "Acceptance", 1.35,
 	      outputFileName_Acc);
     
     graphs_Acc_fitted.push_back(graph_Acc_fitted);
   }
 
-  std::string outputFileName = TString(inputFileName.data()).ReplaceAll(".root", "_fitted.root").Data();
+  std::string outputFileName = TString(inputFileName.data()).ReplaceAll("_lo", "_nlo").ReplaceAll(".root", "_fitted.root").Data();
   TFile* outputFile = new TFile(outputFileName.data(), "RECREATE");
   for ( std::vector<TGraph*>::iterator graph = graphs_xSection_woAcc_fitted.begin();
 	graph != graphs_xSection_woAcc_fitted.end(); ++graph ) {

@@ -1,83 +1,23 @@
-<bin   file="testSVfitMEM.cc" name="testSVfitMEM">
+<bin   file="testSVfitMEM_lo.cc" name="testSVfitMEM_lo">
   <use name="FWCore/ParameterSet"/>
   <use name="TauAnalysis/SVfitMEM"/>
   <use name="rootcintex"/>
   <use name="root"/>
 </bin>
-<bin   file="testHttXsectionStableHiggs.cc" name="testHttXsectionStableHiggs">
+<bin   file="testHttXsectionWithTauDecays_lo.cc" name="testHttXsectionWithTauDecays_lo">
   <use name="FWCore/ParameterSet"/>
   <use name="TauAnalysis/SVfitMEM"/>
   <use name="rootcintex"/>
   <use name="root"/>
 </bin>
-<bin   file="testHttXsectionStableTaus.cc" name="testHttXsectionStableTaus">
-  <use name="FWCore/ParameterSet"/>
-  <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
-  <use name="root"/>
-</bin>
-<bin   file="testHttXsectionWithTauDecays.cc" name="testHttXsectionWithTauDecays">
-  <use name="FWCore/ParameterSet"/>
-  <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
-  <use name="root"/>
-</bin>
-<bin   file="testHttXsectionWithTauDecays_leplep.cc" name="testHttXsectionWithTauDecays_leplep">
-  <use name="FWCore/ParameterSet"/>
-  <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
-  <use name="root"/>
-</bin>
-<bin   file="testHttXsectionWithTauDecays_lephad.cc" name="testHttXsectionWithTauDecays_lephad">
-  <use name="FWCore/ParameterSet"/>
-  <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
-  <use name="root"/>
-</bin>
-<bin   file="testHttXsectionWithTauDecays_hadlep.cc" name="testHttXsectionWithTauDecays_hadlep">
-  <use name="FWCore/ParameterSet"/>
-  <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
-  <use name="root"/>
-</bin>
-<bin   file="testHttXsectionWithTauDecays_hadhad.cc" name="testHttXsectionWithTauDecays_hadhad">
-  <use name="FWCore/ParameterSet"/>
-  <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
-  <use name="root"/>
-</bin>
-<bin   file="testHttXsectionWithTauDecays_pipi.cc" name="testHttXsectionWithTauDecays_pipi">
-  <use name="FWCore/ParameterSet"/>
-  <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
-  <use name="root"/>
-</bin>
-<bin   file="testHttXsectionWithTauDecays_pirho.cc" name="testHttXsectionWithTauDecays_pirho">
-  <use name="FWCore/ParameterSet"/>
-  <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
-  <use name="root"/>
-</bin>
-<bin   file="testHttXsectionWithTauDecays_rhopi.cc" name="testHttXsectionWithTauDecays_rhopi">
-  <use name="FWCore/ParameterSet"/>
-  <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
-  <use name="root"/>
-</bin>
-<bin   file="testHttXsectionWithTauDecays_rhorho.cc" name="testHttXsectionWithTauDecays_rhorho">
-  <use name="FWCore/ParameterSet"/>
-  <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
-  <use name="root"/>
-</bin>
-<bin   file="compSVfitMEM_xSection_times_Acc.cc" name="compSVfitMEM_xSection_times_Acc">
+<bin   file="compSVfitMEM_xSection_times_Acc_lo.cc" name="compSVfitMEM_xSection_times_Acc_lo">
   <use name="FWCore/ParameterSet"/>
   <use name="FWCore/PythonParameterSet"/>
   <use name="TauAnalysis/SVfitMEM"/>
   <use name="rootcintex"/>
   <use name="root"/>
 </bin>
-<bin   file="compSVfitMEM_xSection_times_Acc2.cc" name="compSVfitMEM_xSection_times_Acc2">
+<bin   file="compSVfitMEM_xSection_times_Acc_nlo.cc" name="compSVfitMEM_xSection_times_Acc_nlo">
   <use name="FWCore/ParameterSet"/>
   <use name="FWCore/PythonParameterSet"/>
   <use name="TauAnalysis/SVfitMEM"/>
