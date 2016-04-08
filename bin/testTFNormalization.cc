@@ -6,6 +6,7 @@
 
 #include "TauAnalysis/SVfitMEM/interface/svFitAuxFunctions.h"
 #include "TauAnalysis/SVfitTF/interface/HadTauTFCrystalBall.h"
+#include "TauAnalysis/SVfitTF/interface/HadTauTFCrystalBall2.h"
 
 #include <gsl/gsl_monte.h>
 #include <gsl/gsl_monte_vegas.h>
@@ -18,13 +19,15 @@
 #include <TAxis.h>
 
 using namespace svFitMEM;
+using namespace std;
 
-enum { kTF_met, kTF_lepTauDecay, kTF_hadTauDecay, kTF_hadTauEn };
+enum { kTF_met, kTF_lepTauDecay, kTF_hadTauDecay, kTF_hadTauEn, kTF_hadTauEn2 };
 
 enum { kElectron, kMuon };
 
 double compIntegral(double (*g)(double* x, size_t dim, void* params), int numDimensions, double* xl, double* xu, void* params, double& integralErr)
 {
+  std::cout << "compIntegral..."<< std::endl;
   gsl_monte_function* vegasIntegrand = new gsl_monte_function;
   vegasIntegrand->f = g;
   vegasIntegrand->dim = numDimensions;
@@ -38,17 +41,44 @@ double compIntegral(double (*g)(double* x, size_t dim, void* params), int numDim
   integralErr = 0.;
   vegasWorkspace->stage = 0;
   const int numCallsGridOpt = 100000; 
+  cout<<"start int1\n";
   gsl_monte_vegas_integrate(vegasIntegrand, xl, xu, numDimensions, numCallsGridOpt, vegasRnd, vegasWorkspace, &integral, &integralErr);
   integral = 0.;
   integralErr = 0.;
   vegasWorkspace->stage = 1;
   const int numCallsIntEval = 400000;
+  cout<<"start int2\n";
   gsl_monte_vegas_integrate(vegasIntegrand, xl, xu, numDimensions, numCallsIntEval, vegasRnd, vegasWorkspace, &integral, &integralErr);
   delete vegasIntegrand;
   gsl_monte_vegas_free(vegasWorkspace);
   gsl_rng_free(vegasRnd);
   return integral;
 }
+
+
+double gTF_hadTauEn2(double* x, size_t dim, void* params_void)
+{
+
+  //std::cout << "gTF_hadTauEn2..."<< std::endl;
+  //std::cout<<"x: "<<x[0]<<std::endl;
+  static HadTauTFCrystalBall2* gHadTauTFCrystalBall2 = 0;
+  if ( !gHadTauTFCrystalBall2 ) {
+    gHadTauTFCrystalBall2 = new HadTauTFCrystalBall2();
+  }
+  double* params = (double*)params_void;
+  double genTauPt = params[0];
+  double genTauEta = params[1];
+  int decayMode = TMath::Nint(params[2]);
+  gHadTauTFCrystalBall2->setDecayMode(decayMode);
+  double rec_div_genTauPt = x[0];
+  double recTauPt = rec_div_genTauPt*genTauPt;
+  double prob = (*gHadTauTFCrystalBall2)(recTauPt, genTauPt, genTauEta);
+  //static int idxCall = 0;
+  //std::cout << "<gTF_hadTauEn2 (call #" << idxCall << "): prob = " << prob << std::endl;
+  //++idxCall;
+  return prob;
+} 
+
 
 double gTF_met(double* x, size_t dim, void* params_void)
 {
@@ -155,6 +185,7 @@ double gTF_hadTauEn(double* x, size_t dim, void* params_void)
   return prob;
 }
 
+
 void fillWithOverFlow(TH1* histogram, double x, double weight = 1.)
 {
   TAxis* xAxis = histogram->GetXaxis();
@@ -168,22 +199,71 @@ void fillWithOverFlow(TH1* histogram, double x, double weight = 1.)
 
 int main(int argc, char* argv[]) 
 {
+
   std::vector<int> checksToRun;
   //checksToRun.push_back(kTF_met);
   //checksToRun.push_back(kTF_lepTauDecay);
   //checksToRun.push_back(kTF_hadTauDecay);
-  checksToRun.push_back(kTF_hadTauEn);
+  //checksToRun.push_back(kTF_hadTauEn);
+  checksToRun.push_back(kTF_hadTauEn2);
 
   TH1* norm_met = new TH1D("norm_met", "norm_met", 10000, 0., 10.);
   TH1* norm_lepTauDecay = new TH1D("norm_lepTauDecay", "norm_lepTauDecay", 10000, 0., 10.);
   TH1* norm_hadTauDecay = new TH1D("norm_hadTauDecay", "norm_hadTauDecay", 10000, 0., 10.);
   TH1* norm_hadTauEn = new TH1D("norm_hadTauEn", "norm_hadTauEn", 10000, 0., 10.);
+  TH1* norm_hadTauEn2 = new TH1D("norm_hadTauEn2", "norm_hadTauEn2", 10000, 0., 10.); 
 
   int idxCheck = 0;
   for ( std::vector<int>::const_iterator checkToRun = checksToRun.begin();
 	checkToRun != checksToRun.end(); ++checkToRun ) {
     std::cout << "running check #" << idxCheck << ":" << std::endl;
-    if ( (*checkToRun) == kTF_met ) {
+
+    if ( (*checkToRun) == kTF_hadTauEn2 ) {
+      std::cout << "checking transfer function for hadronic tau energy reconstruction 2..." << std::endl;
+      int numToys = 200;
+      TRandom3 rnd;
+      for ( int idxToy = 0; idxToy < numToys; ++idxToy ) {
+	double tauPt = rnd.Uniform(20., 100.);
+	double tauEta = rnd.Uniform(-2.3, +2.3);
+	double tauPhi = rnd.Uniform(-TMath::Pi(), +TMath::Pi());
+	std::cout << "tau: Pt = " << tauPt << ", eta = " << tauEta << ", phi = " << tauPhi << std::endl;
+	double visMass = rnd.Uniform(chargedPionMass, 1.5);
+	std::cout << "visMass = " << visMass << std::endl;
+	int decayMode = -1;
+	while ( !(decayMode == 0 || decayMode == 1 || decayMode == 2 || decayMode == 10) ) {
+	  decayMode = TMath::Nint(rnd.Uniform(-0.5, +10.5));
+	}
+	std::cout << "decayMode = " << decayMode << std::endl;
+	double* xl = new double[1];
+	double* xu = new double[1];
+	xl[0] = 0.;
+	xu[0] = 2.;
+	double* params = new double[3];
+	params[0] = tauPt;
+	params[1] = tauEta;
+	params[2] = decayMode;
+	double normalizationErr;
+
+	//!!!
+	//params[0] = 100;
+	//params[1] = 0;
+	//params[2] = 2; // all
+	params[2] =  0;   // 1prong0pi0
+	//params[2] =  1; // 1prong1pi0
+	//params[2] =  5; // 2prong0pi0
+	//params[2] =  6; // 2prong1pi0
+	//params[2] = 10; // 3prong0pi0
+	//params[2] = 11; // 3prong1pi0
+	//!!!
+	double normalization = compIntegral(&gTF_hadTauEn2, 1, xl, xu, params, normalizationErr);
+	delete [] xl;
+	delete [] xu;
+	delete [] params;
+	fillWithOverFlow(norm_hadTauEn2, normalization);
+	std::cout << " toy #" << idxToy << ": normalization = " << normalization << " +/- " << normalizationErr
+	  << " (expected = 1.0, ratio = " << normalization << " +/- " << normalizationErr << ")" << std::endl;
+      } 
+    }else if ( (*checkToRun) == kTF_met ) {
       std::cout << "checking MET transfer function..." << std::endl;
       int numToys = 1000;
       double metResolution = 10.;
@@ -344,7 +424,8 @@ int main(int argc, char* argv[])
 	std::cout << " toy #" << idxToy << ": normalization = " << normalization << " +/- " << normalizationErr 
 		  << " (expected = 1.0, ratio = " << normalization << " +/- " << normalizationErr << ")" << std::endl;
       }
-    } else {
+    }
+    else {
       std::cerr << "Check of type = " << (*checkToRun) << " is not defined !!" << std::endl;
       assert(0);
     }
@@ -356,6 +437,7 @@ int main(int argc, char* argv[])
   norm_lepTauDecay->Write();
   norm_hadTauDecay->Write();
   norm_hadTauEn->Write();
+  norm_hadTauEn2->Write();
   delete outputFile;
 
   return 0;
