@@ -15,7 +15,7 @@ namespace svFitMEM
   class SVfitIntegrand_lo
   {
    public:
-    /// error codes that can be read out by SVfitMEM
+    /// error codes that can be read out by SVfitMEM class
     enum ErrorCodes {
       None            = 0x00000000,
       MatrixInversion = 0x00000001,

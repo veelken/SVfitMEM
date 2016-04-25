@@ -1,7 +1,7 @@
 
 /**
-   \class testSVfitMEM testSVfitMEM.cc "TauAnalysis/SVfitStandalone/bin/testSVfitMEM.cc"
-   \brief Basic example of the use of the standalone version of SVfit based on matrix elements
+   \class testSVfitMEM testSVfitMEM.cc "TauAnalysis/SVfitMEM/bin/testSVfitMEM.cc"
+   \brief Basic example of the use of the standalone version of the SVfit algorithm, based on the matrix element method
 */
 
 #include "FWCore/ParameterSet/interface/FileInPath.h"
@@ -39,7 +39,7 @@ namespace
   }
 }
 
-void singleEvent()
+int main(int argc, char* argv[]) 
 {
   /* 
      This is a single event for testing purposes.
@@ -111,11 +111,5 @@ void singleEvent()
   double Lmax = svFitAlgo.Lmax();
   std::cout << "mass = " << mass << " +/- " << massErr << ", Lmax = " << Lmax << " (expected values = 121.505 +/- 15.281, Lmax = 1.11915e-10)" << std::endl;
 
-  return;
-}
-
-int main(int argc, char* argv[]) 
-{
-  singleEvent();
   return 0;
 }
