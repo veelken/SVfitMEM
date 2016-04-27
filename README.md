@@ -17,15 +17,21 @@ Do *not* try to compile the code yet.
 
 The SVfitPerformanceStudies package requires the installation of an external library (VAMP) for numeric integration, which is not included in CMSSW by default.
 In order to install this library, execute:
+	In order to install this library, execute:
 	cd $CMSSW_BASE
 	mkdir VAMP
 	cd VAMP
 	wget http://www.hepforge.org/archive/whizard/vamp-2.2.7.tar.gz
 	tar -xzvf vamp-2.2.7.tar.gz
 	cd vamp-2.2.7
-	./configure
+	mkdir $CMSSW_BASE/VAMP/vamp-2.2.7/prefix
+	mkdir $CMSSW_BASE/VAMP/vamp-2.2.7/prefix/share/
+	mkdir $CMSSW_BASE/VAMP/vamp-2.2.7/prefix/share/doc
+	mkdir $CMSSW_BASE/VAMP/vamp-2.2.7/prefix/share/doc/vamp
+	./configure --prefix=$CMSSW_BASE/VAMP/vamp-2.2.7/prefix
 	make
 	make install
+	cp $CMSSW_BASE/VAMP/vamp-2.2.7/prefix/lib/* $CMSSW_BASE/lib/$SCRAM_ARCH
 
 You now need to declare the VAMP library as external library in CMSSW.
 In order to do this, execute:
