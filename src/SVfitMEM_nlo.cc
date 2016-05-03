@@ -51,6 +51,8 @@ SVfitMEM_nlo::SVfitMEM_nlo(double sqrtS, const std::string& pdfName, int verbosi
     addLogM_power_(2.), 
     useHadTauTF_(false),
     clock_(0),
+    numSeconds_cpu_(-1.),
+    numSeconds_real_(-1.),
     verbosity_(verbosity)
 { 
   integrand_ = new SVfitIntegrand_nlo(sqrtS_, pdfName, verbosity_);
@@ -167,9 +169,10 @@ SVfitMEM_nlo::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons
 {
   if ( verbosity_ >= 1 ) {
     std::cout << "<SVfitMEM_nlo::integrate>:" << std::endl;
-    clock_->Reset();
-    clock_->Start("<SVfitMEM_nlo::integrate>");
   }
+
+  clock_->Reset();
+  clock_->Start("<SVfitMEM_nlo::integrate>");
   
   std::vector<MeasuredTauLepton> measuredTauLeptons_rounded;
   for ( std::vector<MeasuredTauLepton>::const_iterator measuredTauLepton = measuredTauLeptons.begin();
@@ -519,6 +522,10 @@ SVfitMEM_nlo::integrate(const std::vector<MeasuredTauLepton>& measuredTauLeptons
   delete [] xu_;
 
   delete intAlgo_;
+
+  clock_->Stop("<SVfitMEM_nlo::integrate>");
+  numSeconds_cpu_ = clock_->GetCpuTime("<SVfitMEM_nlo::integrate>");
+  numSeconds_real_ = clock_->GetRealTime("<SVfitMEM_nlo::integrate>");
 
   if ( verbosity_ >= 1 ) {
     clock_->Show("<SVfitMEM_nlo::integrate>");

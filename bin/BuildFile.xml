@@ -1,33 +1,28 @@
 <bin   file="testSVfitMEM_lo.cc" name="testSVfitMEM_lo">
   <use name="FWCore/ParameterSet"/>
   <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
   <use name="root"/>
 </bin>
 <bin   file="testHttXsectionWithTauDecays_lo.cc" name="testHttXsectionWithTauDecays_lo">
   <use name="FWCore/ParameterSet"/>
   <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
   <use name="root"/>
 </bin>
 <bin   file="compSVfitMEM_xSection_times_Acc_lo.cc" name="compSVfitMEM_xSection_times_Acc_lo">
   <use name="FWCore/ParameterSet"/>
   <use name="FWCore/PythonParameterSet"/>
   <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
   <use name="root"/>
 </bin>
 <bin   file="compSVfitMEM_xSection_times_Acc_nlo.cc" name="compSVfitMEM_xSection_times_Acc_nlo">
   <use name="FWCore/ParameterSet"/>
   <use name="FWCore/PythonParameterSet"/>
   <use name="TauAnalysis/SVfitMEM"/>
-  <use name="rootcintex"/>
   <use name="root"/>
 </bin>
 <bin   file="testTFNormalization.cc" name="testTFNormalization">
   <use name="FWCore/ParameterSet"/>
   <use name="TauAnalysis/SVfitMEM"/>
   <use name="TauAnalysis/SVfitTF"/>
-  <use name="rootcintex"/>
   <use name="root"/>
 </bin>

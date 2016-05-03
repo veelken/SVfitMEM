@@ -84,7 +84,11 @@ class SVfitMEM_nlo
   /// return maximum of likelihood function
   double Lmax() const { return Lmax_; }  
   /// return flag indicating if algorithm succeeded to find valid solution
-  bool isValidSolution() { return isValidSolution_; }
+  bool isValidSolution() const { return isValidSolution_; }
+
+  /// return computing time (in seconds) spent on last call to integrate method
+  double getComputingTime_cpu() const { return numSeconds_cpu_; }
+  double getComputingTime_real() const { return numSeconds_real_; }
 
   enum { kMarkovChain, kVEGAS, kVAMP }; 
 
@@ -131,6 +135,8 @@ class SVfitMEM_nlo
 
   /// clock for measuring run-time of algorithm
   TBenchmark* clock_;
+  double numSeconds_cpu_;
+  double numSeconds_real_;
 
   /// verbosity level
   int verbosity_;
