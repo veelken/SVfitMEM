@@ -105,7 +105,7 @@ double me_ggH_lo_lit::getMatrixElement_woHtoTauTauDecay() const
   double Q2 = q2_;
   assert(pdfIsInitialized_);
   double alphaS = pdf_->alphasQ2(Q2);
-  //std::cout << "Q = " << Q << ": alphaS = " << alphaS << std::endl;
+  //std::cout << "Q = " << TMath::Sqrt(Q2) << ": alphaS = " << alphaS << " (alphaS@mZ = " << pdf_->alphasQ2(square(91.2)) << ")" << std::endl;
   double me = constFactor*square(alphaS)*square(tau)*square(q2_)*(square(1. + (1. - tau)*Re_f) + square((1. - tau)*Im_f));
   //std::cout << "me = " << me << std::endl;
   return me;
